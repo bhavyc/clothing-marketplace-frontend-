@@ -1,4 +1,4 @@
-package com.clothing.app.clothing_app
+package com.vamikabhargavi
 
 import io.flutter.embedding.android.FlutterActivity
 
