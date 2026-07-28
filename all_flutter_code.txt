@@ -1,0 +1,5221 @@
+﻿=== File: E:\projects\clothing_app\lib\main.dart ===
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'core/constants/colors.dart';
+import 'providers/auth_provider.dart';
+import 'providers/product_provider.dart';
+import 'providers/cart_provider.dart';
+import 'views/splash_screen.dart';
+
+void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProvider(create: (_) => ProductProvider()),
+        ChangeNotifierProvider(create: (_) => CartProvider()),
+      ],
+      child: const BoutiqueApp(),
+    ),
+  );
+}
+
+class BoutiqueApp extends StatelessWidget {
+  const BoutiqueApp({super.key});
+  
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Vamika & Bhargavi',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        useMaterial3: true,
+        scaffoldBackgroundColor: AppColors.cream,
+        colorScheme: const ColorScheme.light(
+          primary: AppColors.charcoal,
+          secondary: AppColors.gold,
+          surface: AppColors.cream,
+        ),
+      ),
+      home: const SplashScreen(),
+    );
+  }
+}
+
+=== File: E:\projects\clothing_app\lib\core\constants\colors.dart ===
+import 'package:flutter/material.dart';
+
+class AppColors {
+  // Brand Main Palette (Luxury Serif Vibe)
+  static const Color cream = Color(0xFFFAF6F0);
+  static const Color creamDark = Color(0xFFFAF8F5);
+  static const Color charcoal = Color(0xFF1A1A1A);
+  static const Color gold = Color(0xFFD4AF37);
+  static const Color goldLight = Color(0xFFE8DFC8);
+  static const Color goldDark = Color(0xFFB89028);
+  
+  // Secondary / Accent Colors
+  static const Color stone = Color(0xFF78716C);
+  static const Color stoneLight = Color(0xFFE7E5E4);
+  static const Color offWhite = Color(0xFFFFFFFF);
+  static const Color cardBg = Color(0x99FAF6F0); // Translucent warm beige
+  
+  // Status Colors
+  static const Color success = Color(0xFF2E7D32);
+  static const Color error = Color(0xFFC62828);
+  static const Color warning = Color(0xFFEF6C00);
+}
+
+=== File: E:\projects\clothing_app\lib\core\constants\text_styles.dart ===
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'colors.dart';
+
+class AppTextStyles {
+  // Luxury Serif Headings (Playfair Display)
+  static TextStyle serifHeading1({Color color = AppColors.charcoal}) => 
+      GoogleFonts.playfairDisplay(
+        fontSize: 32,
+        fontWeight: FontWeight.w600,
+        color: color,
+      );
+
+  static TextStyle serifHeading2({Color color = AppColors.charcoal}) => 
+      GoogleFonts.playfairDisplay(
+        fontSize: 24,
+        fontWeight: FontWeight.w600,
+        color: color,
+      );
+
+  static TextStyle serifHeading3({Color color = AppColors.charcoal}) => 
+      GoogleFonts.playfairDisplay(
+        fontSize: 20,
+        fontWeight: FontWeight.w500,
+        color: color,
+      );
+
+  static TextStyle serifBody({Color color = AppColors.charcoal, double fontSize = 14}) => 
+      GoogleFonts.playfairDisplay(
+        fontSize: fontSize,
+        color: color,
+      );
+
+  // Modern Sans-serif text (Inter)
+  static TextStyle sansBody({Color color = AppColors.charcoal, double fontSize = 14, FontWeight fontWeight = FontWeight.normal}) => 
+      GoogleFonts.inter(
+        fontSize: fontSize,
+        fontWeight: fontWeight,
+        color: color,
+      );
+
+  static TextStyle sansSubtitle({Color color = AppColors.stone}) => 
+      GoogleFonts.inter(
+        fontSize: 12,
+        color: color,
+      );
+
+  static TextStyle uppercaseLabel({Color color = AppColors.gold, double fontSize = 11, double letterSpacing = 1.5, FontWeight fontWeight = FontWeight.bold}) => 
+      GoogleFonts.inter(
+        fontSize: fontSize,
+        fontWeight: fontWeight,
+        color: color,
+        letterSpacing: letterSpacing,
+      );
+}
+
+=== File: E:\projects\clothing_app\lib\core\network\api_client.dart ===
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+
+class ApiClient {
+  static String baseUrl = 'http://10.54.220.134:3000/api';
+
+  static String formatImageUrl(String url) {
+    if (url.isEmpty) return 'https://via.placeholder.com/150';
+    
+    // Replace localhost or 127.0.0.1 references with active host IP
+    if (url.contains('localhost:3000')) {
+      return url.replaceAll('http://localhost:3000', baseUrl.replaceAll('/api', ''));
+    }
+    if (url.contains('127.0.0.1:3000')) {
+      return url.replaceAll('http://127.0.0.1:3000', baseUrl.replaceAll('/api', ''));
+    }
+    
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return url;
+    }
+    
+    final path = url.startsWith('/') ? url : '/$url';
+    return '${baseUrl.replaceAll('/api', '')}$path';
+  }
+
+  static Future<Map<String, String>> _getHeaders() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token');
+    
+    final Map<String, String> headers = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    };
+
+    if (token != null && token.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $token';
+    }
+
+    return headers;
+  }
+
+  static Future<http.Response> get(String path) async {
+    final url = Uri.parse('$baseUrl$path');
+    final headers = await _getHeaders();
+    return http.get(url, headers: headers);
+  }
+
+  static Future<http.Response> post(String path, Map<String, dynamic> body) async {
+    final url = Uri.parse('$baseUrl$path');
+    final headers = await _getHeaders();
+    return http.post(url, headers: headers, body: json.encode(body));
+  }
+
+  static Future<http.Response> put(String path, Map<String, dynamic> body) async {
+    final url = Uri.parse('$baseUrl$path');
+    final headers = await _getHeaders();
+    return http.put(url, headers: headers, body: json.encode(body));
+  }
+
+  static Future<http.Response> delete(String path) async {
+    final url = Uri.parse('$baseUrl$path');
+    final headers = await _getHeaders();
+    return http.delete(url, headers: headers);
+  }
+}
+
+=== File: E:\projects\clothing_app\lib\models\cart_item.dart ===
+import 'package:clothing_app/core/network/api_client.dart';
+import 'product.dart';
+
+// ... (rest of model details)
+
+class SelectedOption {
+  final String id;
+  final String optionName;
+  final String optionValue;
+  final double priceAdjustment;
+
+  SelectedOption({
+    required this.id,
+    required this.optionName,
+    required this.optionValue,
+    required this.priceAdjustment,
+  });
+
+  factory SelectedOption.fromJson(Map<String, dynamic> json) {
+    return SelectedOption(
+      id: json['id'] ?? '',
+      optionName: json['optionName'] ?? '',
+      optionValue: json['optionValue'] ?? '',
+      priceAdjustment: (json['priceAdjustment'] as num?)?.toDouble() ?? 0.0,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'optionName': optionName,
+      'optionValue': optionValue,
+      'priceAdjustment': priceAdjustment,
+    };
+  }
+}
+
+class CartItem {
+  final String id; // Compound unique key: variantId_topSize_bottomSize_sortedOptions
+  final String productId;
+  final String productTitle;
+  final String productImage;
+  final String category;
+  final String sellerShopName;
+  final String variantId;
+  final String? topSize;
+  final String? bottomSize;
+  final double basePrice; // Base price of variant
+  final List<SelectedOption> selectedOptions;
+  int quantity;
+  final double unitPrice; // basePrice + options priceAdjustment sum
+  final String deliveryTimeline;
+
+  CartItem({
+    required this.id,
+    required this.productId,
+    required this.productTitle,
+    required this.productImage,
+    required this.category,
+    required this.sellerShopName,
+    required this.variantId,
+    this.topSize,
+    this.bottomSize,
+    required this.basePrice,
+    required this.selectedOptions,
+    required this.quantity,
+    required this.unitPrice,
+    required this.deliveryTimeline,
+  });
+
+  factory CartItem.fromJson(Map<String, dynamic> json) {
+    return CartItem(
+      id: json['id'] ?? '',
+      productId: json['productId'] ?? '',
+      productTitle: json['productTitle'] ?? '',
+      productImage: ApiClient.formatImageUrl(json['productImage'] ?? ''),
+      category: json['category'] ?? '',
+      sellerShopName: json['sellerShopName'] ?? '',
+      variantId: json['variantId'] ?? '',
+      topSize: json['topSize'],
+      bottomSize: json['bottomSize'],
+      basePrice: (json['basePrice'] as num?)?.toDouble() ?? 0.0,
+      selectedOptions: (json['selectedOptions'] as List?)
+              ?.map((o) => SelectedOption.fromJson(o))
+              .toList() ??
+          [],
+      quantity: json['quantity'] ?? 1,
+      unitPrice: (json['unitPrice'] as num?)?.toDouble() ?? 0.0,
+      deliveryTimeline: json['deliveryTimeline'] ?? '10-15 Days',
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'productId': productId,
+      'productTitle': productTitle,
+      'productImage': productImage,
+      'category': category,
+      'sellerShopName': sellerShopName,
+      'variantId': variantId,
+      'topSize': topSize,
+      'bottomSize': bottomSize,
+      'basePrice': basePrice,
+      'selectedOptions': selectedOptions.map((o) => o.toJson()).toList(),
+      'quantity': quantity,
+      'unitPrice': unitPrice,
+      'deliveryTimeline': deliveryTimeline,
+    };
+  }
+}
+
+=== File: E:\projects\clothing_app\lib\models\order.dart ===
+import 'dart:convert';
+import 'package:clothing_app/core/network/api_client.dart';
+
+class OrderModel {
+  final String id;
+  final String orderNumber;
+  final String customerName;
+  final String customerEmail;
+  final String customerPhone;
+  final String shippingAddress;
+  final String city;
+  final String state;
+  final String pincode;
+  final double subtotal;
+  final double discountAmount;
+  final double totalAmount;
+  final double walletPaid;
+  final String paymentType;
+  final String paymentStatus;
+  final String status; // PLACED, CONFIRMED, SHIPPED, DELIVERED, CANCELLED
+  final String? trackingCompany;
+  final String? trackingNumber;
+  final String createdAt;
+  final List<OrderItemModel> items;
+
+  OrderModel({
+    required this.id,
+    required this.orderNumber,
+    required this.customerName,
+    required this.customerEmail,
+    required this.customerPhone,
+    required this.shippingAddress,
+    required this.city,
+    required this.state,
+    required this.pincode,
+    required this.subtotal,
+    required this.discountAmount,
+    required this.totalAmount,
+    required this.walletPaid,
+    required this.paymentType,
+    required this.paymentStatus,
+    required this.status,
+    this.trackingCompany,
+    this.trackingNumber,
+    required this.createdAt,
+    required this.items,
+  });
+
+  factory OrderModel.fromJson(Map<String, dynamic> json) {
+    return OrderModel(
+      id: json['id'] ?? '',
+      orderNumber: json['orderNumber'] ?? '',
+      customerName: json['customerName'] ?? '',
+      customerEmail: json['customerEmail'] ?? '',
+      customerPhone: json['customerPhone'] ?? '',
+      shippingAddress: json['shippingAddress'] ?? '',
+      city: json['city'] ?? '',
+      state: json['state'] ?? '',
+      pincode: json['pincode'] ?? '',
+      subtotal: (json['subtotal'] as num?)?.toDouble() ?? 0.0,
+      discountAmount: (json['discountAmount'] as num?)?.toDouble() ?? 0.0,
+      totalAmount: (json['totalAmount'] as num?)?.toDouble() ?? 0.0,
+      walletPaid: (json['walletPaid'] as num?)?.toDouble() ?? 0.0,
+      paymentType: json['paymentType'] ?? 'PREPAID',
+      paymentStatus: json['paymentStatus'] ?? 'PENDING',
+      status: json['status'] ?? 'PLACED',
+      trackingCompany: json['trackingCompany'],
+      trackingNumber: json['trackingNumber'],
+      createdAt: json['createdAt'] ?? '',
+      items: (json['items'] as List?)
+              ?.map((i) => OrderItemModel.fromJson(i))
+              .toList() ??
+          [],
+    );
+  }
+}
+
+class OrderItemModel {
+  final String id;
+  final String variantId;
+  final int quantity;
+  final double priceAtPurchase;
+  final String? selectedOptions;
+  final String productTitle;
+  final String productImage;
+
+  OrderItemModel({
+    required this.id,
+    required this.variantId,
+    required this.quantity,
+    required this.priceAtPurchase,
+    this.selectedOptions,
+    required this.productTitle,
+    required this.productImage,
+  });
+
+  factory OrderItemModel.fromJson(Map<String, dynamic> json) {
+    String title = 'Designer Apparel';
+    String image = '';
+
+    if (json['variant'] != null && json['variant']['product'] != null) {
+      final product = json['variant']['product'];
+      title = product['title'] ?? 'Designer Apparel';
+      
+      // Parse product images
+      var imageVal = product['images'];
+      if (imageVal is List && imageVal.isNotEmpty) {
+        image = imageVal[0].toString();
+      } else if (imageVal is String && imageVal.isNotEmpty) {
+        try {
+          if (imageVal.startsWith('[')) {
+            // parsed as array string
+            var decoded = jsonDecode(imageVal);
+            if (decoded is List && decoded.isNotEmpty) {
+              image = decoded[0].toString();
+            }
+          } else {
+            image = imageVal;
+          }
+        } catch (e) {
+          image = imageVal;
+        }
+      }
+    }
+
+    return OrderItemModel(
+      id: json['id'] ?? '',
+      variantId: json['variantId'] ?? '',
+      quantity: json['quantity'] ?? 1,
+      priceAtPurchase: (json['priceAtPurchase'] as num?)?.toDouble() ?? 0.0,
+      selectedOptions: json['selectedOptions'],
+      productTitle: title,
+      productImage: ApiClient.formatImageUrl(image),
+    );
+  }
+}
+
+=== File: E:\projects\clothing_app\lib\models\product.dart ===
+import 'dart:convert';
+import 'package:clothing_app/core/network/api_client.dart';
+
+class Product {
+  final String id;
+  final String title;
+  final String description;
+  final List<String> images;
+  final String category;
+  final String? collection;
+  final String? fabricDetails;
+  final String? careInstructions;
+  final String deliveryTimeline;
+  final bool isSet;
+  final String tier;
+  final String? topLength;
+  final String? pantLength;
+  final String? sleeveLength;
+  final bool isBestseller;
+  final double discountPercent;
+  final String sizeChartType;
+  final String? sizeChartData;
+  final String sellerId;
+  final String? sellerShopName;
+  final List<ProductVariant> variants;
+  final List<ProductOption> options;
+
+  Product({
+    required this.id,
+    required this.title,
+    required this.description,
+    required this.images,
+    required this.category,
+    this.collection,
+    this.fabricDetails,
+    this.careInstructions,
+    required this.deliveryTimeline,
+    required this.isSet,
+    required this.tier,
+    this.topLength,
+    this.pantLength,
+    this.sleeveLength,
+    required this.isBestseller,
+    required this.discountPercent,
+    required this.sizeChartType,
+    this.sizeChartData,
+    required this.sellerId,
+    this.sellerShopName,
+    required this.variants,
+    required this.options,
+  });
+
+  factory Product.fromJson(Map<String, dynamic> json) {
+    // Robust parsing for images list
+    var imageVal = json['images'];
+    List<String> imageList = [];
+    if (imageVal is String) {
+      try {
+        var decoded = jsonDecode(imageVal);
+        if (decoded is List) {
+          imageList = decoded.map((e) => e.toString()).toList();
+        } else {
+          imageList = [imageVal];
+        }
+      } catch (e) {
+        imageList = [imageVal];
+      }
+    } else if (imageVal is List) {
+      imageList = imageVal.map((e) => e.toString()).toList();
+    }
+
+    // Format all image URLs to be absolute network references
+    imageList = imageList.map((url) => ApiClient.formatImageUrl(url)).toList();
+
+    return Product(
+      id: json['id'] ?? '',
+      title: json['title'] ?? '',
+      description: json['description'] ?? '',
+      images: imageList,
+      category: json['category'] ?? '',
+      collection: json['collection'],
+      fabricDetails: json['fabricDetails'],
+      careInstructions: json['careInstructions'],
+      deliveryTimeline: json['deliveryTimeline'] ?? '10-15 Days',
+      isSet: json['isSet'] ?? false,
+      tier: json['tier'] ?? 'LUXE',
+      topLength: json['topLength']?.toString(),
+      pantLength: json['pantLength']?.toString(),
+      sleeveLength: json['sleeveLength']?.toString(),
+      isBestseller: json['isBestseller'] ?? false,
+      discountPercent: (json['discountPercent'] as num?)?.toDouble() ?? 0.0,
+      sizeChartType: json['sizeChartType'] ?? 'STANDARD',
+      sizeChartData: json['sizeChartData']?.toString(),
+      sellerId: json['sellerId'] ?? '',
+      sellerShopName: json['seller'] != null ? json['seller']['shopName'] : null,
+      variants: (json['variants'] as List?)
+              ?.map((v) => ProductVariant.fromJson(v))
+              .toList() ??
+          [],
+      options: (json['options'] as List?)
+              ?.map((o) => ProductOption.fromJson(o))
+              .toList() ??
+          [],
+    );
+  }
+}
+
+class ProductVariant {
+  final String id;
+  final String productId;
+  final String? topSize;
+  final String? bottomSize;
+  final double price;
+  final int stock;
+
+  ProductVariant({
+    required this.id,
+    required this.productId,
+    this.topSize,
+    this.bottomSize,
+    required this.price,
+    required this.stock,
+  });
+
+  factory ProductVariant.fromJson(Map<String, dynamic> json) {
+    return ProductVariant(
+      id: json['id'] ?? '',
+      productId: json['productId'] ?? '',
+      topSize: json['topSize'],
+      bottomSize: json['bottomSize'],
+      price: (json['price'] as num?)?.toDouble() ?? 0.0,
+      stock: json['stock'] ?? 0,
+    );
+  }
+}
+
+class ProductOption {
+  final String id;
+  final String productId;
+  final String optionName;
+  final String optionValue;
+  final double priceAdjustment;
+
+  ProductOption({
+    required this.id,
+    required this.productId,
+    required this.optionName,
+    required this.optionValue,
+    required this.priceAdjustment,
+  });
+
+  factory ProductOption.fromJson(Map<String, dynamic> json) {
+    return ProductOption(
+      id: json['id'] ?? '',
+      productId: json['productId'] ?? '',
+      optionName: json['optionName'] ?? '',
+      optionValue: json['optionValue'] ?? '',
+      priceAdjustment: (json['priceAdjustment'] as num?)?.toDouble() ?? 0.0,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'optionName': optionName,
+      'optionValue': optionValue,
+      'priceAdjustment': priceAdjustment,
+    };
+  }
+}
+
+=== File: E:\projects\clothing_app\lib\models\user.dart ===
+class UserModel {
+  final String id;
+  final String? name;
+  final String email;
+  final String? phone;
+  final String role;
+  final double walletBalance;
+
+  UserModel({
+    required this.id,
+    this.name,
+    required this.email,
+    this.phone,
+    required this.role,
+    required this.walletBalance,
+  });
+
+  factory UserModel.fromJson(Map<String, dynamic> json) {
+    return UserModel(
+      id: json['id'] ?? '',
+      name: json['name'],
+      email: json['email'] ?? '',
+      phone: json['phone'],
+      role: json['role'] ?? 'CUSTOMER',
+      walletBalance: (json['walletBalance'] as num?)?.toDouble() ?? 0.0,
+    );
+  }
+}
+
+=== File: E:\projects\clothing_app\lib\providers\auth_provider.dart ===
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../models/user.dart';
+import '../services/auth_service.dart';
+
+class AuthProvider with ChangeNotifier {
+  final AuthService _authService = AuthService();
+  
+  UserModel? _user;
+  bool _isAuthenticated = false;
+  bool _isLoading = false;
+  String? _phone;
+
+  UserModel? get user => _user;
+  bool get isAuthenticated => _isAuthenticated;
+  bool get isLoading => _isLoading;
+  String? get phone => _phone;
+
+  AuthProvider() {
+    _loadSession();
+  }
+
+  // Load session from SharedPreferences on startup
+  Future<void> _loadSession() async {
+    _isLoading = true;
+    notifyListeners();
+
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token');
+    _phone = prefs.getString('user_phone');
+
+    if (token != null && token.isNotEmpty) {
+      _isAuthenticated = true;
+      await fetchUserProfile();
+    }
+
+    _isLoading = false;
+    notifyListeners();
+  }
+
+  // Fetch updated profile (wallet balance) from server
+  Future<void> fetchUserProfile() async {
+    final profile = await _authService.getProfile();
+    if (profile != null) {
+      _user = profile;
+      _isAuthenticated = true;
+    } else {
+      // Token is likely expired/invalid, clear it
+      await logout();
+    }
+    notifyListeners();
+  }
+
+  // Send verification OTP to phone
+  Future<bool> sendOtp(String phone) async {
+    _isLoading = true;
+    notifyListeners();
+    final success = await _authService.sendOtp(phone);
+    _isLoading = false;
+    notifyListeners();
+    return success;
+  }
+
+  // Verify OTP and complete login
+  Future<bool> verifyOtp(String phone, String otp) async {
+    _isLoading = true;
+    notifyListeners();
+
+    final response = await _authService.verifyOtp(phone, otp);
+    if (response != null && response['success'] == true) {
+      _phone = phone;
+      _isAuthenticated = true;
+      await fetchUserProfile();
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    }
+
+    _isLoading = false;
+    notifyListeners();
+    return false;
+  }
+
+  // Log out session
+  Future<void> logout() async {
+    await _authService.logout();
+    _user = null;
+    _phone = null;
+    _isAuthenticated = false;
+    notifyListeners();
+  }
+}
+
+=== File: E:\projects\clothing_app\lib\providers\cart_provider.dart ===
+import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../models/cart_item.dart';
+import '../services/cart_service.dart';
+
+class CartProvider with ChangeNotifier {
+  final CartService _cartService = CartService();
+
+  List<CartItem> _items = [];
+  bool _isLoading = false;
+  String? _couponCode;
+  double _couponDiscountPercent = 0.0;
+  double _couponMinOrderValue = 0.0;
+
+  List<CartItem> get items => _items;
+  bool get isLoading => _isLoading;
+  String? get couponCode => _couponCode;
+  double get couponDiscountPercent => _couponDiscountPercent;
+
+  int get cartCount => _items.fold(0, (sum, item) => sum + item.quantity);
+  
+  double get cartSubtotal => _items.fold(0.0, (sum, item) => sum + (item.unitPrice * item.quantity));
+
+  double get discountAmount {
+    if (_couponCode == null || cartSubtotal < _couponMinOrderValue) return 0.0;
+    return (cartSubtotal * (_couponDiscountPercent / 100));
+  }
+
+  double get finalTotal => cartSubtotal - discountAmount;
+
+  CartProvider() {
+    _loadLocalCart();
+  }
+
+  // Load cart from local storage cache on startup
+  Future<void> _loadLocalCart() async {
+    final prefs = await SharedPreferences.getInstance();
+    final localCartStr = prefs.getString('boutique_cart');
+    
+    if (localCartStr != null) {
+      try {
+        final List decoded = json.decode(localCartStr);
+        _items = decoded.map((e) => CartItem.fromJson(e)).toList();
+      } catch (e) {
+        print('CartProvider _loadLocalCart error: $e');
+      }
+    }
+    notifyListeners();
+  }
+
+  // Sync state to local storage and DB if token exists
+  Future<void> _syncState() async {
+    // 1. Cache locally
+    final prefs = await SharedPreferences.getInstance();
+    final encoded = json.encode(_items.map((i) => i.toJson()).toList());
+    await prefs.setString('boutique_cart', encoded);
+
+    // 2. Sync to backend DB if authenticated
+    final token = prefs.getString('auth_token');
+    if (token != null && token.isNotEmpty) {
+      await _cartService.syncCart(_items);
+    }
+  }
+
+  // Fetch verified database cart (refreshes prices/discounts)
+  Future<void> refreshCartFromServer() async {
+    _isLoading = true;
+    notifyListeners();
+
+    final serverItems = await _cartService.fetchCart();
+    if (serverItems.isNotEmpty) {
+      _items = serverItems;
+      // Update local cache
+      final prefs = await SharedPreferences.getInstance();
+      final encoded = json.encode(_items.map((i) => i.toJson()).toList());
+      await prefs.setString('boutique_cart', encoded);
+    }
+
+    _isLoading = false;
+    notifyListeners();
+  }
+
+  // Adds an item to the bag
+  Future<void> addItem(CartItem newItem) async {
+    final existingIndex = _items.indexWhere((i) => i.id == newItem.id);
+
+    if (existingIndex > -1) {
+      _items[existingIndex].quantity += newItem.quantity;
+    } else {
+      _items.add(newItem);
+    }
+    
+    notifyListeners();
+    await _syncState();
+  }
+
+  // Updates item quantity
+  Future<void> updateQuantity(String id, int qty) async {
+    if (qty <= 0) {
+      await removeItem(id);
+      return;
+    }
+
+    final index = _items.indexWhere((i) => i.id == id);
+    if (index > -1) {
+      _items[index].quantity = qty;
+      notifyListeners();
+      await _syncState();
+    }
+  }
+
+  // Removes item from the bag
+  Future<void> removeItem(String id) async {
+    _items.removeWhere((i) => i.id == id);
+    notifyListeners();
+    await _syncState();
+  }
+
+  // Clears the cart completely after order placement
+  Future<void> clearCart() async {
+    _items = [];
+    _couponCode = null;
+    _couponDiscountPercent = 0.0;
+    _couponMinOrderValue = 0.0;
+    
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('boutique_cart');
+    
+    final token = prefs.getString('auth_token');
+    if (token != null && token.isNotEmpty) {
+      await _cartService.syncCart([]);
+    }
+  }
+
+  // Apply Coupon Code
+  Future<bool> applyCoupon(String code) async {
+    // Basic verification (Mock validation for UI/UX locally if backend checks fail or not set)
+    // Real coupon verification runs dynamically
+    if (code.toUpperCase() == 'PAY5') {
+      _couponCode = 'PAY5';
+      _couponDiscountPercent = 5.0;
+      _couponMinOrderValue = 1000.0;
+      notifyListeners();
+      return true;
+    }
+    
+    // Default fallback mock support for general boutique testing coupons
+    if (code.toUpperCase() == 'WELCOME10') {
+      _couponCode = 'WELCOME10';
+      _couponDiscountPercent = 10.0;
+      _couponMinOrderValue = 2000.0;
+      notifyListeners();
+      return true;
+    }
+
+    return false;
+  }
+
+  void removeCoupon() {
+    _couponCode = null;
+    _couponDiscountPercent = 0.0;
+    _couponMinOrderValue = 0.0;
+    notifyListeners();
+  }
+}
+
+=== File: E:\projects\clothing_app\lib\providers\product_provider.dart ===
+import 'package:flutter/material.dart';
+import '../models/product.dart';
+import '../services/product_service.dart';
+
+class ProductProvider with ChangeNotifier {
+  final ProductService _productService = ProductService();
+
+  List<Product> _products = [];
+  List<Product> _filteredProducts = [];
+  List<String> _categories = [];
+  List<String> _collections = [];
+  bool _isLoading = false;
+  String _selectedCategory = '';
+  String _selectedCollection = '';
+  String _searchQuery = '';
+
+  List<Product> get products => _products;
+  List<Product> get filteredProducts => _filteredProducts;
+  List<String> get categories => _categories;
+  List<String> get collections => _collections;
+  bool get isLoading => _isLoading;
+  String get selectedCategory => _selectedCategory;
+  String get selectedCollection => _selectedCollection;
+
+  ProductProvider() {
+    loadCatalog();
+  }
+
+  // Load catalog list and categories navigation metadata
+  Future<void> loadCatalog() async {
+    _isLoading = true;
+    notifyListeners();
+
+    // 1. Fetch products lists
+    _products = await _productService.fetchProducts();
+    _filteredProducts = List.from(_products);
+
+    // 2. Fetch categories and collections navigation data
+    final nav = await _productService.fetchNavigationData();
+    _categories = nav['categories'] ?? [];
+    _collections = nav['collections'] ?? [];
+
+    _isLoading = false;
+    notifyListeners();
+  }
+
+  // Filter local array dynamically to prevent unnecessary API fetches
+  void applyFilters({String? category, String? collection, String? search}) {
+    if (category != null) _selectedCategory = category;
+    if (collection != null) _selectedCollection = collection;
+    if (search != null) _searchQuery = search.toLowerCase().trim();
+
+    _filteredProducts = _products.where((product) {
+      final matchesCategory = _selectedCategory.isEmpty || 
+          product.category.toLowerCase() == _selectedCategory.toLowerCase();
+      
+      final matchesCollection = _selectedCollection.isEmpty || 
+          (product.collection != null && 
+           product.collection!.toLowerCase() == _selectedCollection.toLowerCase());
+      
+      final matchesSearch = _searchQuery.isEmpty || 
+          product.title.toLowerCase().contains(_searchQuery) || 
+          product.description.toLowerCase().contains(_searchQuery) ||
+          product.category.toLowerCase().contains(_searchQuery);
+
+      return matchesCategory && matchesCollection && matchesSearch;
+    }).toList();
+
+    notifyListeners();
+  }
+
+  // Reset all filters back to default
+  void clearFilters() {
+    _selectedCategory = '';
+    _selectedCollection = '';
+    _searchQuery = '';
+    _filteredProducts = List.from(_products);
+    notifyListeners();
+  }
+
+  // Reload products lists from server directly (e.g. pull to refresh)
+  Future<void> refreshCatalog() async {
+    _products = await _productService.fetchProducts();
+    applyFilters();
+  }
+}
+
+=== File: E:\projects\clothing_app\lib\services\api_service.dart ===
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import '../models/product.dart';
+
+class ApiService {
+  // Agar aap local machine par test kar rahe hain:
+  // Android Emulator ke liye local host IP: 'http://10.0.2.2:3000' hoti hai.
+  // iOS Simulator ke liye: 'http://localhost:3000'
+  static const String baseUrl = 'http://10.54.220.134:3000'; 
+
+  // 1. OTP Send Request
+  static Future<Map<String, dynamic>> sendOtp(String phoneNumber) async {
+    final url = Uri.parse('$baseUrl/api/auth/otp/send');
+    try {
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'phone': phoneNumber}),
+      );
+
+      final decodedData = jsonDecode(response.body);
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return {
+          'success': true,
+          'message': decodedData['message'] ?? 'OTP sent successfully',
+          'devOtp': decodedData['devOtp'], // Dev environment ke liye bypass OTP
+        };
+      } else {
+        return {
+          'success': false,
+          'error': decodedData['error'] ?? 'Failed to send OTP'
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'error': 'Network connection failed.'};
+    }
+  }
+
+  // 2. OTP Verification Request
+  static Future<Map<String, dynamic>> verifyOtp({
+    required String phoneNumber,
+    required String otp,
+    required bool optInWhatsApp,
+  }) async {
+    final url = Uri.parse('$baseUrl/api/auth/otp/verify');
+    try {
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'phone': phoneNumber,
+          'otp': otp,
+          'optInWhatsApp': optInWhatsApp,
+        }),
+      );
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return {'success': true, 'message': data['message']};
+      } else {
+        return {'success': false, 'error': data['error'] ?? 'Verification failed.'};
+      }
+    } catch (e) {
+      return {'success': false, 'error': 'Network error, please try again.'};
+    }
+  }
+
+
+
+   static Future<Map<String, List<String>>> fetchNavigation(String mode) async {
+    final url = Uri.parse('$baseUrl/api/navigation?mode=$mode');
+    try {
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        return {
+          'categories': List<String>.from(decoded['categories'] ?? []),
+          'collections': List<String>.from(decoded['collections'] ?? []),
+        };
+      }
+    } catch (e) {
+      print('Navigation error: $e');
+    }
+    return {'categories': [], 'collections': []};
+  }
+
+  // 4. Products List Fetch (by active segment/tier and category)
+  static Future<List<Product>> fetchProducts({
+    required String tier,
+    String? category,
+  }) async {
+    String query = 'tier=$tier';
+    if (category != null && category.isNotEmpty) {
+      query += '&category=${Uri.encodeComponent(category)}';
+    }
+
+    final url = Uri.parse('$baseUrl/api/products?$query');
+    try {
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> decoded = jsonDecode(response.body);
+        final List data = decoded['products'] ?? [];
+        return data.map((json) => Product.fromJson(json)).toList();
+      }
+    } catch (e) {
+      print('Fetch products error: $e');
+    }
+    return [];
+  }
+}
+
+=== File: E:\projects\clothing_app\lib\services\auth_service.dart ===
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../core/network/api_client.dart';
+import '../models/user.dart';
+
+class AuthService {
+  // Requests OTP to be sent via SMS/Console
+  Future<bool> sendOtp(String phone) async {
+    try {
+      final res = await ApiClient.post('/auth/otp/send', {'phone': phone});
+      if (res.statusCode == 200) {
+        final data = json.decode(res.body);
+        return data['success'] ?? false;
+      }
+      return false;
+    } catch (e) {
+      print('AuthService sendOtp error: $e');
+      return false;
+    }
+  }
+
+  // Verifies OTP and returns user profile & JWT token
+  Future<Map<String, dynamic>?> verifyOtp(String phone, String otp) async {
+    try {
+      final res = await ApiClient.post('/auth/otp/verify', {
+        'phone': phone,
+        'otp': otp,
+      });
+
+      if (res.statusCode == 200) {
+        final data = json.decode(res.body);
+        if (data['success'] == true) {
+          final String token = data['token'] ?? '';
+          
+          // Save JWT token locally
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('auth_token', token);
+          await prefs.setString('user_phone', phone);
+          
+          // Return user profile data and token
+          return data;
+        }
+      }
+      return null;
+    } catch (e) {
+      print('AuthService verifyOtp error: $e');
+      return null;
+    }
+  }
+
+  // Fetch current user wallet and profile details
+  Future<UserModel?> getProfile() async {
+    try {
+      final res = await ApiClient.get('/user/wallet');
+      if (res.statusCode == 200) {
+        final data = json.decode(res.body);
+        // Next.js returns { walletBalance: 1200, user: { id: '...', email: '...' } }
+        if (data['user'] != null) {
+          final userJson = Map<String, dynamic>.from(data['user']);
+          userJson['walletBalance'] = data['walletBalance'] ?? 0.0;
+          return UserModel.fromJson(userJson);
+        }
+      }
+      return null;
+    } catch (e) {
+      print('AuthService getProfile error: $e');
+      return null;
+    }
+  }
+
+  // Log out by clearing token from storage
+  Future<void> logout() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('auth_token');
+    await prefs.remove('user_phone');
+  }
+}
+
+=== File: E:\projects\clothing_app\lib\services\cart_service.dart ===
+import 'dart:convert';
+import '../core/network/api_client.dart';
+import '../models/cart_item.dart';
+
+class CartService {
+  // Retrieves active cart items list from database (recalculated prices)
+  Future<List<CartItem>> fetchCart() async {
+    try {
+      final res = await ApiClient.get('/cart');
+      if (res.statusCode == 200) {
+        final data = json.decode(res.body);
+        final List list = data['items'] ?? [];
+        return list.map((i) => CartItem.fromJson(i)).toList();
+      }
+      return [];
+    } catch (e) {
+      print('CartService fetchCart error: $e');
+      return [];
+    }
+  }
+
+  // Uploads/syncs local items state array back into database
+  Future<bool> syncCart(List<CartItem> items) async {
+    try {
+      final bodyItems = items.map((i) => i.toJson()).toList();
+      final res = await ApiClient.post('/cart', {'items': bodyItems});
+      if (res.statusCode == 200) {
+        final data = json.decode(res.body);
+        return data['success'] ?? false;
+      }
+      return false;
+    } catch (e) {
+      print('CartService syncCart error: $e');
+      return false;
+    }
+  }
+}
+
+=== File: E:\projects\clothing_app\lib\services\order_service.dart ===
+import 'dart:convert';
+import '../core/network/api_client.dart';
+import '../models/order.dart';
+import '../models/cart_item.dart';
+
+class OrderService {
+  // Places order transaction in database
+  Future<Map<String, dynamic>?> placeOrder({
+    required String name,
+    required String email,
+    required String phone,
+    required String address,
+    required String city,
+    required String state,
+    required String pincode,
+    required List<CartItem> items,
+    required bool useWallet,
+    String? couponId,
+  }) async {
+    try {
+      final body = {
+        'customerName': name,
+        'customerEmail': email,
+        'customerPhone': phone,
+        'shippingAddress': address,
+        'city': city,
+        'state': state,
+        'pincode': pincode,
+        'paymentType': 'PREPAID',
+        'couponId': couponId,
+        'useWallet': useWallet,
+        'items': items.map((item) => {
+          'variantId': item.variantId,
+          'quantity': item.quantity,
+          'priceAtPurchase': item.unitPrice,
+          'selectedOptions': json.encode(item.selectedOptions.map((o) => o.toJson()).toList()),
+        }).toList(),
+      };
+
+      final res = await ApiClient.post('/orders', body);
+      if (res.statusCode == 200) {
+        return json.decode(res.body);
+      } else {
+        final data = json.decode(res.body);
+        throw Exception(data['error'] ?? 'Order submission failed.');
+      }
+    } catch (e) {
+      print('OrderService placeOrder error: $e');
+      rethrow;
+    }
+  }
+
+  // Verifies signature (real or mock)
+  Future<bool> verifyPayment({
+    required String orderNumber,
+    required String paymentId,
+    required String orderId,
+    required String signature,
+  }) async {
+    try {
+      final res = await ApiClient.post('/orders/verify', {
+        'orderNumber': orderNumber,
+        'razorpayPaymentId': paymentId,
+        'razorpayOrderId': orderId,
+        'razorpaySignature': signature,
+      });
+
+      if (res.statusCode == 200) {
+        final data = json.decode(res.body);
+        return data['success'] ?? false;
+      }
+      return false;
+    } catch (e) {
+      print('OrderService verifyPayment error: $e');
+      return false;
+    }
+  }
+
+  // Fetch past orders list of customer
+  Future<List<OrderModel>> fetchOrders() async {
+    try {
+      final res = await ApiClient.get('/orders');
+      if (res.statusCode == 200) {
+        final data = json.decode(res.body);
+        final List list = data['orders'] ?? [];
+        return list.map((o) => OrderModel.fromJson(o)).toList();
+      }
+      return [];
+    } catch (e) {
+      print('OrderService fetchOrders error: $e');
+      return [];
+    }
+  }
+
+  // Fetch specific order details (e.g. for success tracking)
+  Future<OrderModel?> fetchOrderDetail(String orderNumber) async {
+    try {
+      final res = await ApiClient.get('/orders?orderNumber=$orderNumber');
+      if (res.statusCode == 200) {
+        final data = json.decode(res.body);
+        if (data['order'] != null) {
+          return OrderModel.fromJson(data['order']);
+        }
+      }
+      return null;
+    } catch (e) {
+      print('OrderService fetchOrderDetail error: $e');
+      return null;
+    }
+  }
+
+  // Request order return
+  Future<bool> requestReturn({
+    required String orderId,
+    required List<Map<String, dynamic>> returnItems,
+  }) async {
+    try {
+      final res = await ApiClient.post('/orders/$orderId/return', {
+        'items': returnItems,
+      });
+      return res.statusCode == 200;
+    } catch (e) {
+      print('OrderService requestReturn error: $e');
+      return false;
+    }
+  }
+}
+
+=== File: E:\projects\clothing_app\lib\services\product_service.dart ===
+import 'dart:convert';
+import '../core/network/api_client.dart';
+import '../models/product.dart';
+
+class ProductService {
+  // Fetch products lists with optional category/collection query
+  Future<List<Product>> fetchProducts({String? category, String? collection}) async {
+    try {
+      String query = '';
+      if (category != null && category.isNotEmpty) {
+        query += '?category=${Uri.encodeComponent(category)}';
+      }
+      if (collection != null && collection.isNotEmpty) {
+        query += query.isEmpty 
+            ? '?collection=${Uri.encodeComponent(collection)}' 
+            : '&collection=${Uri.encodeComponent(collection)}';
+      }
+
+      final res = await ApiClient.get('/products$query');
+      if (res.statusCode == 200) {
+        final data = json.decode(res.body);
+        final List list = data['products'] ?? [];
+        return list.map((p) => Product.fromJson(p)).toList();
+      }
+      return [];
+    } catch (e) {
+      print('ProductService fetchProducts error: $e');
+      return [];
+    }
+  }
+
+  // Fetch single product details with options and variants
+  Future<Product?> fetchProductDetail(String id) async {
+    try {
+      final res = await ApiClient.get('/products?id=$id');
+      if (res.statusCode == 200) {
+        final data = json.decode(res.body);
+        if (data['product'] != null) {
+          return Product.fromJson(data['product']);
+        }
+      }
+      return null;
+    } catch (e) {
+      print('ProductService fetchProductDetail error: $e');
+      return null;
+    }
+  }
+
+  // Fetch unique categories and collections list for navigation
+  Future<Map<String, List<String>>> fetchNavigationData() async {
+    try {
+      final res = await ApiClient.get('/navigation');
+      if (res.statusCode == 200) {
+        final data = json.decode(res.body);
+        final List categories = data['categories'] ?? [];
+        final List collections = data['collections'] ?? [];
+        return {
+          'categories': categories.map((e) => e.toString()).toList(),
+          'collections': collections.map((e) => e.toString()).toList(),
+        };
+      }
+      return {'categories': [], 'collections': []};
+    } catch (e) {
+      print('ProductService fetchNavigationData error: $e');
+      return {'categories': [], 'collections': []};
+    }
+  }
+}
+
+=== File: E:\projects\clothing_app\lib\views\main_navigation.dart ===
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:lucide_icons/lucide_icons.dart';
+import '../core/constants/colors.dart';
+import '../core/constants/text_styles.dart';
+import '../providers/cart_provider.dart';
+import 'home/home_screen.dart';
+import 'shop/catalog_screen.dart';
+import 'cart/cart_screen.dart';
+import 'profile/profile_screen.dart';
+
+class MainNavigation extends StatefulWidget {
+  const MainNavigation({Key? key}) : super(key: key);
+
+  @override
+  _MainNavigationState createState() => _MainNavigationState();
+}
+
+class _MainNavigationState extends State<MainNavigation> {
+  int _currentIndex = 0;
+
+  final List<Widget> _screens = [
+    const HomeScreen(),
+    const CatalogScreen(),
+    const CartScreen(),
+    const ProfileScreen(),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final cartCount = context.watch<CartProvider>().cartCount;
+
+    return Scaffold(
+      body: IndexedStack(
+        index: _currentIndex,
+        children: _screens,
+      ),
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          border: Border(
+            top: BorderSide(color: AppColors.goldLight.withOpacity(0.4), width: 1),
+          ),
+        ),
+        child: BottomNavigationBar(
+          currentIndex: _currentIndex,
+          onTap: (index) {
+            setState(() {
+              _currentIndex = index;
+            });
+          },
+          backgroundColor: AppColors.offWhite,
+          selectedItemColor: AppColors.gold,
+          unselectedItemColor: AppColors.stone.withOpacity(0.7),
+          selectedLabelStyle: AppTextStyles.sansBody(fontSize: 10, fontWeight: FontWeight.w600),
+          unselectedLabelStyle: AppTextStyles.sansBody(fontSize: 10),
+          type: BottomNavigationBarType.fixed,
+          elevation: 0,
+          items: [
+            const BottomNavigationBarItem(
+              icon: Icon(LucideIcons.home, size: 20),
+              activeIcon: Icon(LucideIcons.home, size: 20),
+              label: 'Home',
+            ),
+            const BottomNavigationBarItem(
+              icon: Icon(LucideIcons.search, size: 20),
+              activeIcon: Icon(LucideIcons.search, size: 20),
+              label: 'Shop',
+            ),
+            BottomNavigationBarItem(
+              icon: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  const Icon(LucideIcons.shoppingBag, size: 20),
+                  if (cartCount > 0)
+                    Positioned(
+                      top: -4,
+                      right: -6,
+                      child: Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: const BoxDecoration(
+                          color: AppColors.charcoal,
+                          shape: BoxShape.circle,
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 14,
+                          minHeight: 14,
+                        ),
+                        child: Text(
+                          '$cartCount',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 8,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              label: 'Bag',
+            ),
+            const BottomNavigationBarItem(
+              icon: Icon(LucideIcons.user, size: 20),
+              activeIcon: Icon(LucideIcons.user, size: 20),
+              label: 'Profile',
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+=== File: E:\projects\clothing_app\lib\views\splash_screen.dart ===
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../core/constants/colors.dart';
+import '../core/constants/text_styles.dart';
+import '../providers/auth_provider.dart';
+import 'main_navigation.dart';
+import 'profile/login_screen.dart';
+
+class SplashScreen extends StatefulWidget {
+  const SplashScreen({Key? key}) : super(key: key);
+
+  @override
+  _SplashScreenState createState() => _SplashScreenState();
+}
+
+class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _fadeAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    );
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeIn),
+    );
+
+    _controller.forward();
+    _navigateToHome();
+  }
+
+  Future<void> _navigateToHome() async {
+    await Future.delayed(const Duration(milliseconds: 2800));
+    if (!mounted) return;
+    
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    
+    Widget nextScreen;
+    if (auth.isAuthenticated) {
+      nextScreen = const MainNavigation();
+    } else {
+      nextScreen = const LoginScreen(redirectToCheckout: false);
+    }
+    
+    Navigator.of(context).pushReplacement(
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) => nextScreen,
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return FadeTransition(opacity: animation, child: child);
+        },
+        transitionDuration: const Duration(milliseconds: 800),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.cream,
+      body: Center(
+        child: FadeTransition(
+          opacity: _fadeAnimation,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Luxury logo
+              Text(
+                'vamika',
+                style: AppTextStyles.serifHeading1(color: AppColors.charcoal).copyWith(
+                  fontSize: 44,
+                  letterSpacing: 2.0,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '&',
+                style: AppTextStyles.serifBody(color: AppColors.gold, fontSize: 32).copyWith(
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'bhargavi',
+                style: AppTextStyles.serifHeading1(color: AppColors.charcoal).copyWith(
+                  fontSize: 44,
+                  letterSpacing: 2.0,
+                ),
+              ),
+              const SizedBox(height: 24),
+              Container(
+                width: 40,
+                height: 1,
+                color: AppColors.gold.withOpacity(0.6),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'HANDCRAFTED LUXURY WEAR',
+                style: AppTextStyles.uppercaseLabel(
+                  color: AppColors.stone,
+                  fontSize: 9,
+                  letterSpacing: 3.5,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+=== File: E:\projects\clothing_app\lib\views\cart\cart_screen.dart ===
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:lucide_icons/lucide_icons.dart';
+import '../../core/constants/colors.dart';
+import '../../core/constants/text_styles.dart';
+import '../../providers/cart_provider.dart';
+import '../../providers/auth_provider.dart';
+import '../profile/login_screen.dart';
+import '../checkout/checkout_screen.dart';
+
+class CartScreen extends StatefulWidget {
+  const CartScreen({Key? key}) : super(key: key);
+
+  @override
+  _CartScreenState createState() => _CartScreenState();
+}
+
+class _CartScreenState extends State<CartScreen> {
+  final TextEditingController _couponController = TextEditingController();
+  String _couponError = '';
+
+  @override
+  void dispose() {
+    _couponController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cartProvider = context.watch<CartProvider>();
+    final authProvider = context.watch<AuthProvider>();
+    final items = cartProvider.items;
+
+    return Scaffold(
+      backgroundColor: AppColors.cream,
+      appBar: AppBar(
+        backgroundColor: AppColors.cream,
+        elevation: 0,
+        centerTitle: true,
+        title: Text(
+          'shopping bag',
+          style: AppTextStyles.serifHeading3(color: AppColors.charcoal).copyWith(
+            fontSize: 20,
+            letterSpacing: 1.5,
+          ),
+        ),
+      ),
+      body: items.isEmpty
+          ? _buildEmptyBag(context)
+          : Column(
+              children: [
+                Expanded(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: items.length,
+                    itemBuilder: (context, index) {
+                      final item = items[index];
+                      return _buildCartItemCard(context, item, cartProvider);
+                    },
+                  ),
+                ),
+                
+                // Coupon input & Totals summary block
+                _buildSummaryBlock(context, cartProvider, authProvider),
+              ],
+            ),
+    );
+  }
+
+  Widget _buildEmptyBag(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(LucideIcons.shoppingBag, color: AppColors.gold, size: 64),
+          const SizedBox(height: 16),
+          Text(
+            'Your shopping bag is empty',
+            style: AppTextStyles.serifHeading3(),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Add some handcrafted luxury apparel to get started.',
+            style: AppTextStyles.sansSubtitle(),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCartItemCard(BuildContext context, dynamic item, CartProvider provider) {
+    final optionText = item.selectedOptions.isNotEmpty
+        ? item.selectedOptions.map((o) => '${o.optionName}: ${o.optionValue}').join(', ')
+        : null;
+
+    final sizeText = [
+      item.topSize != null ? 'Top: ${item.topSize}' : null,
+      item.bottomSize != null ? 'Bottom: ${item.bottomSize}' : null,
+    ].where((e) => e != null).join(', ');
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: AppColors.goldLight.withOpacity(0.3)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Image
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: Image.network(
+              item.productImage,
+              width: 80,
+              height: 100,
+              fit: BoxFit.cover,
+            ),
+          ),
+          const SizedBox(width: 16),
+          
+          // Item Details
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        item.productTitle,
+                        style: AppTextStyles.sansBody(fontWeight: FontWeight.bold, fontSize: 13),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(LucideIcons.trash2, size: 16, color: Colors.grey),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      onPressed: () => provider.removeItem(item.id),
+                    ),
+                  ],
+                ),
+                Text(
+                  'by ${item.sellerShopName}',
+                  style: AppTextStyles.sansSubtitle().copyWith(fontSize: 10),
+                ),
+                const SizedBox(height: 6),
+                
+                // Size description
+                if (sizeText.isNotEmpty)
+                  Text(
+                    sizeText,
+                    style: TextStyle(fontSize: 11, color: Colors.grey[700]),
+                  ),
+                
+                // Options description
+                if (optionText != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    optionText,
+                    style: const TextStyle(fontSize: 10, color: AppColors.stone),
+                  ),
+                ],
+                const SizedBox(height: 10),
+                
+                // Price & Quantity counters
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Rs. ${(item.unitPrice * item.quantity).toInt().toString()}',
+                      style: AppTextStyles.sansBody(fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                    
+                    // Quantity adjustments counter
+                    Container(
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey[300]!),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                      child: Row(
+                        children: [
+                          GestureDetector(
+                            onTap: () => provider.updateQuantity(item.id, item.quantity - 1),
+                            child: const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              child: Icon(Icons.remove, size: 12),
+                            ),
+                          ),
+                          Text(
+                            '${item.quantity}',
+                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                          ),
+                          GestureDetector(
+                            onTap: () => provider.updateQuantity(item.id, item.quantity + 1),
+                            child: const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              child: Icon(Icons.add, size: 12),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSummaryBlock(BuildContext context, CartProvider provider, AuthProvider authProvider) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          top: BorderSide(color: AppColors.goldLight.withOpacity(0.5)),
+        ),
+      ),
+      child: SafeArea(
+        child: Column(
+          children: [
+            // Promo Code box
+            if (provider.couponCode == null)
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _couponController,
+                      decoration: InputDecoration(
+                        hintText: 'Enter coupon code (e.g. PAY5)',
+                        hintStyle: AppTextStyles.sansSubtitle().copyWith(fontSize: 11),
+                        errorText: _couponError.isEmpty ? null : _couponError,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        border: const OutlineInputBorder(),
+                        focusedBorder: const OutlineInputBorder(borderSide: BorderSide(color: AppColors.gold)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: () async {
+                      if (_couponController.text.isEmpty) return;
+                      final success = await provider.applyCoupon(_couponController.text);
+                      if (success) {
+                        setState(() {
+                          _couponError = '';
+                        });
+                        _couponController.clear();
+                      } else {
+                        setState(() {
+                          _couponError = 'Invalid coupon code';
+                        });
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.charcoal,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                    ),
+                    child: const Text('Apply'),
+                  ),
+                ],
+              )
+            else
+              Container(
+                padding: const EdgeInsets.all(12),
+                color: AppColors.goldLight.withOpacity(0.2),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(LucideIcons.tag, size: 16, color: AppColors.gold),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Promo code ${provider.couponCode} applied',
+                          style: AppTextStyles.sansBody(fontSize: 12, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 16, color: Colors.grey),
+                      onPressed: () => provider.removeCoupon(),
+                    ),
+                  ],
+                ),
+              ),
+            const SizedBox(height: 16),
+            
+            // Subtotal row
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Subtotal', style: AppTextStyles.sansBody(color: AppColors.stone)),
+                Text('Rs. ${provider.cartSubtotal.toInt().toString()}', style: AppTextStyles.sansBody()),
+              ],
+            ),
+            
+            // Applied Discount Row
+            if (provider.discountAmount > 0) ...[
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Applied Discount', style: AppTextStyles.sansBody(color: AppColors.error)),
+                  Text('- Rs. ${provider.discountAmount.toInt().toString()}', style: AppTextStyles.sansBody(color: AppColors.error)),
+                ],
+              ),
+            ],
+            const SizedBox(height: 12),
+            const Divider(),
+            const SizedBox(height: 8),
+            
+            // Total Row
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Estimated Total',
+                  style: AppTextStyles.sansBody(fontWeight: FontWeight.bold, fontSize: 15),
+                ),
+                Text(
+                  'Rs. ${provider.finalTotal.toInt().toString()}',
+                  style: AppTextStyles.sansBody(fontWeight: FontWeight.bold, fontSize: 15),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            
+            // Checkout button
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => _handleCheckout(context, authProvider),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.charcoal,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                ),
+                child: Text(
+                  'PROCEED TO CHECKOUT',
+                  style: AppTextStyles.uppercaseLabel(color: Colors.white, fontSize: 11, letterSpacing: 2.0),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _handleCheckout(BuildContext context, AuthProvider auth) {
+    if (!auth.isAuthenticated) {
+      // Direct user to log in first
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => const LoginScreen(redirectToCheckout: true),
+        ),
+      );
+    } else {
+      // Push directly to checkout screen
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => const CheckoutScreen(),
+        ),
+      );
+    }
+  }
+}
+
+extension FilterList<T> on List<T?> {
+  String join(String separator) {
+    return where((element) => element != null).map((e) => e.toString()).join(separator);
+  }
+  
+  bool get isNotEmpty => where((element) => element != null).isNotEmpty;
+}
+
+=== File: E:\projects\clothing_app\lib\views\checkout\checkout_screen.dart ===
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:lucide_icons/lucide_icons.dart';
+import '../../core/constants/colors.dart';
+import '../../core/constants/text_styles.dart';
+import '../../models/user.dart';
+import '../../providers/cart_provider.dart';
+import '../../providers/auth_provider.dart';
+import '../../services/order_service.dart';
+import 'success_screen.dart';
+
+class CheckoutScreen extends StatefulWidget {
+  const CheckoutScreen({Key? key}) : super(key: key);
+
+  @override
+  _CheckoutScreenState createState() => _CheckoutScreenState();
+}
+
+class _CheckoutScreenState extends State<CheckoutScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final OrderService _orderService = OrderService();
+
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _addressController = TextEditingController();
+  final TextEditingController _cityController = TextEditingController();
+  final TextEditingController _stateController = TextEditingController();
+  final TextEditingController _pincodeController = TextEditingController();
+
+  bool _useWallet = false;
+  bool _isPlacingOrder = false;
+  String _errorMessage = '';
+
+  @override
+  void initState() {
+    super.initState();
+    // Prefill form details from authenticated user session profile
+    final user = context.read<AuthProvider>().user;
+    if (user != null) {
+      _nameController.text = user.name ?? '';
+      _emailController.text = user.email;
+      _phoneController.text = user.phone ?? '';
+    }
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _phoneController.dispose();
+    _addressController.dispose();
+    _cityController.dispose();
+    _stateController.dispose();
+    _pincodeController.dispose();
+    super.dispose();
+  }
+
+  double get _walletDeduction {
+    if (!_useWallet) return 0.0;
+    final walletBal = context.read<AuthProvider>().user?.walletBalance ?? 0.0;
+    final finalTotal = context.read<CartProvider>().finalTotal;
+    
+    // Deduct whichever is smaller (balance or total amount)
+    return walletBal > finalTotal ? finalTotal : walletBal;
+  }
+
+  double get _finalAmountToPay {
+    final finalTotal = context.read<CartProvider>().finalTotal;
+    return finalTotal - _walletDeduction;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cartProvider = context.watch<CartProvider>();
+    final authProvider = context.watch<AuthProvider>();
+    final user = authProvider.user;
+
+    return Scaffold(
+      backgroundColor: AppColors.cream,
+      appBar: AppBar(
+        backgroundColor: AppColors.cream,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: AppColors.charcoal),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          'shipping & checkout',
+          style: AppTextStyles.serifHeading3().copyWith(fontSize: 18),
+        ),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Address fields form card
+              _buildSectionTitle('Shipping Address'),
+              _buildAddressCard(),
+              const SizedBox(height: 24),
+              
+              // Wallet usage card
+              if (user != null && user.walletBalance > 0) ...[
+                _buildSectionTitle('Wallet Balance'),
+                _buildWalletCard(user),
+                const SizedBox(height: 24),
+              ],
+
+              // Order Summary invoice breakdown
+              _buildSectionTitle('Summary Invoice'),
+              _buildSummaryCard(cartProvider),
+              const SizedBox(height: 30),
+              
+              if (_errorMessage.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16.0),
+                  child: Text(
+                    _errorMessage,
+                    style: const TextStyle(color: AppColors.error, fontSize: 13, fontWeight: FontWeight.bold),
+                  ),
+                ),
+
+              // Confirm button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _isPlacingOrder ? null : () => _handlePlaceOrder(cartProvider, authProvider),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.charcoal,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                  ),
+                  child: _isPlacingOrder
+                      ? const SizedBox(
+                          height: 18,
+                          width: 18,
+                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                        )
+                      : Text(
+                          'PLACE ORDER (Rs. ${_finalAmountToPay.toInt().toString()})',
+                          style: AppTextStyles.uppercaseLabel(color: Colors.white, fontSize: 11, letterSpacing: 2.0),
+                        ),
+                ),
+              ),
+              const SizedBox(height: 40),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10.0),
+      child: Text(
+        title.toUpperCase(),
+        style: AppTextStyles.uppercaseLabel(color: AppColors.gold, fontSize: 10),
+      ),
+    );
+  }
+
+  Widget _buildAddressCard() {
+    return Card(
+      elevation: 0,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(4),
+        side: BorderSide(color: AppColors.goldLight.withOpacity(0.3)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            _buildTextField('Recipient Name', _nameController, true),
+            const SizedBox(height: 12),
+            _buildTextField('Email Address', _emailController, true, keyboardType: TextInputType.emailAddress),
+            const SizedBox(height: 12),
+            _buildTextField('Phone Number', _phoneController, true, keyboardType: TextInputType.phone),
+            const SizedBox(height: 12),
+            _buildTextField('Full Shipping Address', _addressController, true),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(child: _buildTextField('City', _cityController, true)),
+                const SizedBox(width: 10),
+                Expanded(child: _buildTextField('State', _stateController, true)),
+              ],
+            ),
+            const SizedBox(height: 12),
+            _buildTextField('Pincode / Postal Code', _pincodeController, true, keyboardType: TextInputType.number),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTextField(
+    String label, 
+    TextEditingController controller, 
+    bool required, {
+    TextInputType keyboardType = TextInputType.text
+  }) {
+    return TextFormField(
+      controller: controller,
+      keyboardType: keyboardType,
+      style: AppTextStyles.sansBody(fontSize: 13),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: AppTextStyles.sansSubtitle(),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        border: const OutlineInputBorder(),
+        focusedBorder: const OutlineInputBorder(borderSide: BorderSide(color: AppColors.gold)),
+      ),
+      validator: (value) {
+        if (required && (value == null || value.trim().isEmpty)) {
+          return 'This field is required';
+        }
+        return null;
+      },
+    );
+  }
+
+  Widget _buildWalletCard(UserModel user) {
+    return Card(
+      elevation: 0,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(4),
+        side: BorderSide(color: AppColors.goldLight.withOpacity(0.3)),
+      ),
+      child: SwitchListTile(
+        title: Text(
+          'Deduct from Wallet',
+          style: AppTextStyles.sansBody(fontWeight: FontWeight.bold, fontSize: 13),
+        ),
+        subtitle: Text(
+          'Available: Rs. ${user.walletBalance.toInt().toString()}',
+          style: AppTextStyles.sansSubtitle(),
+        ),
+        value: _useWallet,
+        activeColor: AppColors.gold,
+        onChanged: (val) {
+          setState(() {
+            _useWallet = val;
+          });
+        },
+      ),
+    );
+  }
+
+  Widget _buildSummaryCard(CartProvider provider) {
+    return Card(
+      elevation: 0,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(4),
+        side: BorderSide(color: AppColors.goldLight.withOpacity(0.3)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            _buildSummaryRow('Cart Subtotal', provider.cartSubtotal),
+            if (provider.discountAmount > 0)
+              _buildSummaryRow('Applied Promo Discount', -provider.discountAmount, color: AppColors.error),
+            if (_useWallet && _walletDeduction > 0)
+              _buildSummaryRow('Wallet Deduction', -_walletDeduction, color: AppColors.stone),
+            const Divider(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Final Total',
+                  style: AppTextStyles.sansBody(fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+                Text(
+                  'Rs. ${_finalAmountToPay.toInt().toString()}',
+                  style: AppTextStyles.sansBody(fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSummaryRow(String label, double val, {Color? color}) {
+    final formattedVal = val >= 0 
+        ? 'Rs. ${val.toInt().toString()}' 
+        : '- Rs. ${val.abs().toInt().toString()}';
+        
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: AppTextStyles.sansBody(color: color ?? AppColors.stone, fontSize: 12)),
+          Text(formattedVal, style: AppTextStyles.sansBody(color: color ?? AppColors.charcoal, fontSize: 12)),
+        ],
+      ),
+    );
+  }
+
+  void _handlePlaceOrder(CartProvider cart, AuthProvider auth) async {
+    if (!_formKey.currentState!.validate()) return;
+    
+    setState(() {
+      _isPlacingOrder = true;
+      _errorMessage = '';
+    });
+
+    try {
+      // 1. Submit order details to backend route
+      final orderResult = await _orderService.placeOrder(
+        name: _nameController.text.trim(),
+        email: _emailController.text.trim(),
+        phone: _phoneController.text.trim(),
+        address: _addressController.text.trim(),
+        city: _cityController.text.trim(),
+        state: _stateController.text.trim(),
+        pincode: _pincodeController.text.trim(),
+        items: cart.items,
+        useWallet: _useWallet,
+        couponId: cart.couponCode,
+      );
+
+      if (orderResult == null || orderResult['success'] != true) {
+        throw Exception('Server checkout processing failed.');
+      }
+
+      final String orderNumber = orderResult['orderNumber'];
+      final double totalAmount = (orderResult['totalAmount'] as num).toDouble();
+      
+      // 2. Resolve Payment Gateway Verification
+      if (totalAmount == 0) {
+        // Fully paid via wallet deductions, already marked as PAID on server
+        await cart.clearCart();
+        await auth.fetchUserProfile(); // Refresh wallet state
+        
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => SuccessScreen(orderNumber: orderNumber)),
+          (route) => route.isFirst,
+        );
+      } else {
+        // Online Prepaid checkout: Always auto-approve with mock verification in dev/test builds
+        final String? razorpayOrderId = orderResult['razorpayOrderId'];
+        
+        print('Boutique app: Simulating payment verification...');
+        final mockPayId = 'pay_mock_${DateTime.now().millisecondsSinceEpoch.toString().substring(6)}';
+        final mockSig = 'mock_sig_${razorpayOrderId ?? 'order_id'}_$mockPayId';
+
+        final verifySuccess = await _orderService.verifyPayment(
+          orderNumber: orderNumber,
+          paymentId: mockPayId,
+          orderId: razorpayOrderId ?? 'order_id',
+          signature: mockSig,
+        );
+
+        if (verifySuccess) {
+          await cart.clearCart();
+          await auth.fetchUserProfile();
+          
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (context) => SuccessScreen(orderNumber: orderNumber)),
+            (route) => route.isFirst,
+          );
+        } else {
+          throw Exception('Payment simulation verification failed.');
+        }
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = e.toString().replaceAll('Exception:', '').trim();
+        _isPlacingOrder = false;
+      });
+    }
+  }
+}
+
+=== File: E:\projects\clothing_app\lib\views\checkout\success_screen.dart ===
+import 'package:flutter/material.dart';
+import 'package:lucide_icons/lucide_icons.dart';
+import '../../core/constants/colors.dart';
+import '../../core/constants/text_styles.dart';
+import '../main_navigation.dart';
+import '../orders/history_screen.dart';
+
+class SuccessScreen extends StatelessWidget {
+  final String orderNumber;
+  
+  const SuccessScreen({Key? key, required this.orderNumber}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.cream,
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Premium Gold Checkmark Badge
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: AppColors.goldLight.withOpacity(0.3),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  LucideIcons.checkCircle2,
+                  color: AppColors.gold,
+                  size: 64,
+                ),
+              ),
+              const SizedBox(height: 32),
+              
+              Text(
+                'ORDER CONFIRMED',
+                style: AppTextStyles.uppercaseLabel(color: AppColors.gold, fontSize: 12, letterSpacing: 3.0),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Your order has been placed successfully.',
+                style: AppTextStyles.serifHeading3(),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              
+              // Order Identification Card
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: AppColors.goldLight.withOpacity(0.3)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Order Number:',
+                      style: AppTextStyles.sansBody(color: AppColors.stone, fontSize: 13),
+                    ),
+                    Text(
+                      orderNumber,
+                      style: AppTextStyles.sansBody(fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              
+              // Email Notification Banner
+              Text(
+                'A confirmation email containing your item specifications, sizes, pricing details, and expected delivery timeline has been dispatched to your email address.',
+                style: AppTextStyles.sansSubtitle().copyWith(fontSize: 11, height: 1.5),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 40),
+              
+              // CTA Buttons
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(builder: (context) => const MainNavigation()),
+                      (route) => false,
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.charcoal,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                  ),
+                  child: Text(
+                    'CONTINUE SHOPPING',
+                    style: AppTextStyles.uppercaseLabel(color: Colors.white, fontSize: 10, letterSpacing: 2.0),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextButton(
+                onPressed: () {
+                  // Direct to orders list
+                  Navigator.of(context).pushReplacement(
+                    MaterialPageRoute(builder: (context) => const HistoryScreen()),
+                  );
+                },
+                child: Text(
+                  'VIEW ORDER DETAILS',
+                  style: AppTextStyles.uppercaseLabel(color: AppColors.charcoal, fontSize: 10),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+=== File: E:\projects\clothing_app\lib\views\home\home_screen.dart ===
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:lucide_icons/lucide_icons.dart';
+import 'package:shimmer/shimmer.dart';
+import '../../core/constants/colors.dart';
+import '../../core/constants/text_styles.dart';
+import '../../providers/product_provider.dart';
+import '../shop/catalog_screen.dart';
+import '../shop/detail_screen.dart';
+
+class HomeScreen extends StatelessWidget {
+  const HomeScreen({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.cream,
+      appBar: AppBar(
+        backgroundColor: AppColors.cream,
+        elevation: 0,
+        centerTitle: true,
+        title: Text(
+          'vamika & bhargavi',
+          style: AppTextStyles.serifHeading3(color: AppColors.charcoal).copyWith(
+            fontSize: 22,
+            letterSpacing: 1.5,
+          ),
+        ),
+      ),
+      body: RefreshIndicator(
+        onRefresh: () => context.read<ProductProvider>().loadCatalog(),
+        color: AppColors.gold,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 1. Premium Hero Showcase Banner
+              _buildHeroBanner(context),
+              
+              // 2. Minimalist Brand Value Divider Grid
+              _buildBrandValues(context),
+              
+              // 3. Shop Curated Collections
+              _buildCollectionsCarousel(context),
+              
+              // 4. Bestsellers Shelf Showcase
+              _buildBestsellersShelf(context),
+              
+              const SizedBox(height: 40),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeroBanner(BuildContext context) {
+    return Container(
+      height: 360,
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(8),
+        image: const DecorationImage(
+          image: NetworkImage('https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=800&q=80'),
+          fit: BoxFit.cover,
+        ),
+      ),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          gradient: LinearGradient(
+            begin: Alignment.bottomCenter,
+            end: Alignment.topCenter,
+            colors: [
+              AppColors.charcoal.withOpacity(0.85),
+              AppColors.charcoal.withOpacity(0.2),
+              Colors.transparent,
+            ],
+          ),
+        ),
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.end,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Text(
+              'handcrafted luxury couture',
+              style: AppTextStyles.serifHeading2(color: Colors.white).copyWith(
+                fontSize: 26,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'exquisite silhouettes tailored to perfection',
+              style: AppTextStyles.sansBody(color: Colors.white70, fontSize: 11).copyWith(
+                letterSpacing: 1.0,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () {
+                context.read<ProductProvider>().clearFilters();
+                // Navigate to shop screen / tab
+                DefaultTabController.of(context).animateTo(1);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.cream,
+                foregroundColor: AppColors.charcoal,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+              child: Text(
+                'SHOP NOW',
+                style: AppTextStyles.uppercaseLabel(color: AppColors.charcoal, fontSize: 10, letterSpacing: 2.0),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBrandValues(BuildContext context) {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+      margin: const EdgeInsets.symmetric(vertical: 16),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _buildValueItem(LucideIcons.sparkles, 'Artisanal Weaves', 'Handloomed fabrics'),
+              Container(width: 1, height: 40, color: AppColors.goldLight.withOpacity(0.5)),
+              _buildValueItem(LucideIcons.scissors, 'Made to Measure', 'Flawless custom fit'),
+              Container(width: 1, height: 40, color: AppColors.goldLight.withOpacity(0.5)),
+              _buildValueItem(LucideIcons.star, 'Slow Fashion', 'Zero-waste ethics'),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildValueItem(IconData icon, String title, String subtitle) {
+    return Expanded(
+      child: Column(
+        children: [
+          Icon(icon, color: AppColors.gold, size: 20),
+          const SizedBox(height: 8),
+          Text(
+            title,
+            style: AppTextStyles.sansBody(fontSize: 10, fontWeight: FontWeight.bold).copyWith(
+              letterSpacing: 0.5,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 2),
+          Text(
+            subtitle,
+            style: AppTextStyles.sansSubtitle().copyWith(fontSize: 9),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCollectionsCarousel(BuildContext context) {
+    final collections = context.watch<ProductProvider>().collections;
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'CURATED CLOSETS',
+                style: AppTextStyles.uppercaseLabel(color: AppColors.gold, fontSize: 10, letterSpacing: 2.0),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'shop by collection',
+                style: AppTextStyles.serifHeading3(),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 180,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            itemCount: collections.length == 0 ? 3 : collections.length,
+            itemBuilder: (context, index) {
+              if (collections.length == 0) {
+                return _buildCollectionShimmer();
+              }
+              final col = collections[index];
+              return _buildCollectionCard(context, col, index);
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCollectionShimmer() {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey[200]!,
+      highlightColor: Colors.grey[100]!,
+      child: Container(
+        width: 140,
+        margin: const EdgeInsets.symmetric(horizontal: 4),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(4),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCollectionCard(BuildContext context, String collection, int index) {
+    // Curated mock links representation
+    final images = [
+      'https://images.unsplash.com/photo-1595777457583-95e059d581b8?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1608748010899-18f300247112?auto=format&fit=crop&w=600&q=80',
+      'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?auto=format&fit=crop&w=600&q=80'
+    ];
+    final imgUrl = images[index % images.length];
+
+    return GestureDetector(
+      onTap: () {
+        context.read<ProductProvider>().clearFilters();
+        context.read<ProductProvider>().applyFilters(collection: collection);
+        // Toggle tab to catalog
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => const CatalogScreen(),
+          ),
+        );
+      },
+      child: Container(
+        width: 140,
+        margin: const EdgeInsets.symmetric(horizontal: 6),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(4),
+          image: DecorationImage(
+            image: NetworkImage(imgUrl),
+            fit: BoxFit.cover,
+          ),
+        ),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(4),
+            gradient: LinearGradient(
+              begin: Alignment.bottomCenter,
+              end: Alignment.topCenter,
+              colors: [
+                AppColors.charcoal.withOpacity(0.7),
+                Colors.transparent,
+              ],
+            ),
+          ),
+          alignment: Alignment.bottomCenter,
+          padding: const EdgeInsets.all(12),
+          child: Text(
+            collection.toLowerCase(),
+            style: AppTextStyles.serifBody(color: Colors.white, fontSize: 13).copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBestsellersShelf(BuildContext context) {
+    final products = context.watch<ProductProvider>().products;
+    final bestsellers = products.where((p) => p.isBestseller).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 24),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'HIGHLY COVETED',
+                style: AppTextStyles.uppercaseLabel(color: AppColors.gold, fontSize: 10, letterSpacing: 2.0),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'the bestsellers shelf',
+                style: AppTextStyles.serifHeading3(),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        SizedBox(
+          height: 250,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            itemCount: bestsellers.length == 0 ? 3 : bestsellers.length,
+            itemBuilder: (context, index) {
+              if (bestsellers.length == 0) {
+                return _buildProductShimmer();
+              }
+              final product = bestsellers[index];
+              return _buildProductCard(context, product);
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildProductShimmer() {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey[200]!,
+      highlightColor: Colors.grey[100]!,
+      child: Container(
+        width: 160,
+        margin: const EdgeInsets.symmetric(horizontal: 4),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(4),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProductCard(BuildContext context, dynamic product) {
+    final hasDiscount = product.discountPercent > 0;
+    
+    // Find dynamic pricing
+    final double basePrice = product.variants.isNotEmpty ? product.variants[0].price : 0.0;
+    final double salePrice = hasDiscount 
+        ? basePrice * (1 - product.discountPercent / 100) 
+        : basePrice;
+
+    return GestureDetector(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => DetailScreen(product: product),
+          ),
+        );
+      },
+      child: Container(
+        width: 155,
+        margin: const EdgeInsets.symmetric(horizontal: 6),
+        color: Colors.white,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Image Stack
+            Stack(
+              children: [
+                Container(
+                  height: 170,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    image: DecorationImage(
+                      image: NetworkImage(product.images.isNotEmpty ? product.images[0] : 'https://via.placeholder.com/150'),
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ),
+                if (hasDiscount)
+                  Positioned(
+                    top: 8,
+                    left: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      color: AppColors.error,
+                      child: Text(
+                        '${product.discountPercent.toInt()}% OFF',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            
+            // Text Details
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    product.title,
+                    style: AppTextStyles.sansBody(fontSize: 12, fontWeight: FontWeight.bold),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      Text(
+                        'Rs. ${salePrice.toInt().toString()}',
+                        style: AppTextStyles.sansBody(
+                          color: hasDiscount ? AppColors.error : AppColors.charcoal,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      if (hasDiscount) ...[
+                        const SizedBox(width: 6),
+                        Text(
+                          'Rs. ${basePrice.toInt().toString()}',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.grey[500],
+                            decoration: TextDecoration.lineThrough,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+=== File: E:\projects\clothing_app\lib\views\orders\history_screen.dart ===
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:lucide_icons/lucide_icons.dart';
+import '../../core/constants/colors.dart';
+import '../../core/constants/text_styles.dart';
+import '../../models/order.dart';
+import '../../services/order_service.dart';
+import 'tracking_screen.dart';
+
+class HistoryScreen extends StatefulWidget {
+  const HistoryScreen({Key? key}) : super(key: key);
+
+  @override
+  _HistoryScreenState createState() => _HistoryScreenState();
+}
+
+class _HistoryScreenState extends State<HistoryScreen> {
+  final OrderService _orderService = OrderService();
+  
+  List<OrderModel> _orders = [];
+  bool _loading = true;
+  String _error = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadOrders();
+  }
+
+  Future<void> _loadOrders() async {
+    setState(() {
+      _loading = true;
+      _error = '';
+    });
+    
+    try {
+      final list = await _orderService.fetchOrders();
+      setState(() {
+        _orders = list;
+        _loading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = 'Failed to fetch order history. Try again.';
+        _loading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.cream,
+      appBar: AppBar(
+        backgroundColor: AppColors.cream,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: AppColors.charcoal),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          'order history',
+          style: AppTextStyles.serifHeading3().copyWith(fontSize: 18),
+        ),
+      ),
+      body: RefreshIndicator(
+        onRefresh: _loadOrders,
+        color: AppColors.gold,
+        child: _loading
+            ? const Center(child: CircularProgressIndicator(color: AppColors.gold))
+            : _error.isNotEmpty
+                ? _buildErrorView()
+                : _orders.isEmpty
+                    ? _buildEmptyState()
+                    : ListView.builder(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: _orders.length,
+                        itemBuilder: (context, index) {
+                          final order = _orders[index];
+                          return _buildOrderCard(context, order);
+                        },
+                      ),
+      ),
+    );
+  }
+
+  Widget _buildErrorView() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(LucideIcons.alertTriangle, color: AppColors.error, size: 40),
+            const SizedBox(height: 12),
+            Text(
+              _error,
+              style: AppTextStyles.sansBody(fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _loadOrders,
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.charcoal),
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(LucideIcons.package, color: AppColors.gold, size: 48),
+          const SizedBox(height: 16),
+          Text(
+            'No orders placed yet',
+            style: AppTextStyles.serifHeading3(),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Create your first custom order on checkout!',
+            style: AppTextStyles.sansSubtitle(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOrderCard(BuildContext context, OrderModel order) {
+    // Format timestamp nicely
+    final dateString = order.createdAt.substring(0, 10);
+    
+    // Status text chip color
+    Color statusColor;
+    switch (order.status) {
+      case 'DELIVERED':
+        statusColor = AppColors.success;
+        break;
+      case 'CANCELLED':
+        statusColor = AppColors.error;
+        break;
+      default:
+        statusColor = AppColors.gold;
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: AppColors.goldLight.withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Card Header
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            color: AppColors.cream.withOpacity(0.3),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      order.orderNumber,
+                      style: AppTextStyles.sansBody(fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Placed on $dateString',
+                      style: AppTextStyles.sansSubtitle().copyWith(fontSize: 10),
+                    ),
+                  ],
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: statusColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                  child: Text(
+                    order.status,
+                    style: TextStyle(
+                      color: statusColor,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          // Card Items Preview
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              children: [
+                ...order.items.map((item) {
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8.0),
+                    child: Row(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(2),
+                          child: item.productImage.isNotEmpty
+                              ? Image.network(item.productImage, width: 40, height: 48, fit: BoxFit.cover)
+                              : Container(color: Colors.grey[200], width: 40, height: 48),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                item.productTitle,
+                                style: AppTextStyles.sansBody(fontSize: 12, fontWeight: FontWeight.bold),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              Text(
+                                'Qty: ${item.quantity}',
+                                style: AppTextStyles.sansSubtitle().copyWith(fontSize: 10),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Text(
+                          'Rs. ${item.priceAtPurchase.toInt().toString()}',
+                          style: AppTextStyles.sansBody(fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+                
+                const Divider(),
+                
+                // Total Summary & CTA
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    RichText(
+                      text: TextSpan(
+                        style: AppTextStyles.sansBody(fontSize: 12, color: AppColors.stone),
+                        children: [
+                          const TextSpan(text: 'Total Amount: '),
+                          TextSpan(
+                            text: 'Rs. ${order.totalAmount.toInt().toString()}',
+                            style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.charcoal),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        if (order.status == 'DELIVERED') ...[
+                          OutlinedButton(
+                            onPressed: () => _showReturnDialog(context, order),
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(color: AppColors.error),
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(2)),
+                            ),
+                            child: Text(
+                              'RETURN',
+                              style: AppTextStyles.uppercaseLabel(color: AppColors.error, fontSize: 9, letterSpacing: 1.0),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                        ],
+                        ElevatedButton(
+                          onPressed: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (context) => TrackingScreen(orderNumber: order.orderNumber),
+                              ),
+                            );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.charcoal,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(2)),
+                          ),
+                          child: Text(
+                            'TRACK STATUS',
+                            style: AppTextStyles.uppercaseLabel(color: Colors.white, fontSize: 9, letterSpacing: 1.0),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showReturnDialog(BuildContext context, OrderModel order) {
+    final reasonController = TextEditingController();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.cream,
+      builder: (context) {
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+            left: 20,
+            right: 20,
+            top: 20,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'REQUEST RETURN',
+                style: AppTextStyles.serifHeading1(color: AppColors.charcoal).copyWith(fontSize: 18),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Order: ${order.orderNumber}',
+                style: AppTextStyles.sansSubtitle(),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Reason for Return',
+                style: AppTextStyles.sansBody(fontWeight: FontWeight.bold, fontSize: 12),
+              ),
+              const SizedBox(height: 6),
+              TextField(
+                controller: reasonController,
+                decoration: const InputDecoration(
+                  hintText: 'e.g. Size does not fit, defective item...',
+                  border: OutlineInputBorder(),
+                  focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: AppColors.gold)),
+                ),
+                maxLines: 3,
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () async {
+                    final reason = reasonController.text.trim();
+                    if (reason.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Please enter a return reason')),
+                      );
+                      return;
+                    }
+                    
+                    final returnItems = order.items.map((item) => {
+                      'orderItemId': item.id,
+                      'quantity': item.quantity,
+                      'reason': reason,
+                    }).toList();
+                    
+                    final success = await _orderService.requestReturn(
+                      orderId: order.id,
+                      returnItems: returnItems,
+                    );
+                    
+                    Navigator.pop(context); // close bottom sheet
+                    
+                    if (success) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          backgroundColor: AppColors.success,
+                          content: Text('Return request submitted successfully!'),
+                        ),
+                      );
+                      _loadOrders(); // Reload orders
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          backgroundColor: AppColors.error,
+                          content: Text('Failed to submit return request.'),
+                        ),
+                      );
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.charcoal,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                  ),
+                  child: Text(
+                    'SUBMIT RETURN REQUEST',
+                    style: AppTextStyles.uppercaseLabel(color: Colors.white, fontSize: 10, letterSpacing: 1.5),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 30),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+=== File: E:\projects\clothing_app\lib\views\orders\tracking_screen.dart ===
+import 'package:flutter/material.dart';
+import 'package:lucide_icons/lucide_icons.dart';
+import '../../core/constants/colors.dart';
+import '../../core/constants/text_styles.dart';
+import '../../models/order.dart';
+import '../../services/order_service.dart';
+
+class TrackingScreen extends StatefulWidget {
+  final String orderNumber;
+  const TrackingScreen({Key? key, required this.orderNumber}) : super(key: key);
+
+  @override
+  _TrackingScreenState createState() => _TrackingScreenState();
+}
+
+class _TrackingScreenState extends State<TrackingScreen> {
+  final OrderService _orderService = OrderService();
+  OrderModel? _order;
+  bool _loading = true;
+  String _error = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadOrderDetail();
+  }
+
+  Future<void> _loadOrderDetail() async {
+    setState(() {
+      _loading = true;
+      _error = '';
+    });
+    try {
+      final order = await _orderService.fetchOrderDetail(widget.orderNumber);
+      if (order != null) {
+        setState(() {
+          _order = order;
+          _loading = false;
+        });
+      } else {
+        setState(() {
+          _error = 'Order details not found.';
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _error = 'Failed to fetch tracking details.';
+        _loading = false;
+      });
+    }
+  }
+
+  int _getStatusStep(String status) {
+    switch (status) {
+      case 'PLACED':
+        return 0;
+      case 'CONFIRMED':
+        return 1;
+      case 'SHIPPED':
+        return 2;
+      case 'DELIVERED':
+        return 3;
+      default:
+        return 0;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.cream,
+      appBar: AppBar(
+        backgroundColor: AppColors.cream,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: AppColors.charcoal),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          'track status',
+          style: AppTextStyles.serifHeading3().copyWith(fontSize: 18),
+        ),
+      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator(color: AppColors.gold))
+          : _error.isNotEmpty
+              ? _buildErrorView()
+              : _buildTrackingContent(),
+    );
+  }
+
+  Widget _buildErrorView() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(LucideIcons.alertTriangle, color: AppColors.error, size: 36),
+          const SizedBox(height: 12),
+          Text(_error, style: AppTextStyles.sansBody(fontWeight: FontWeight.bold)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTrackingContent() {
+    final order = _order!;
+    final step = _getStatusStep(order.status);
+    final isCancelled = order.status == 'CANCELLED';
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Order Number header
+          Text(
+            order.orderNumber,
+            style: AppTextStyles.serifHeading2(),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Estimated Delivery: 10-15 Days',
+            style: AppTextStyles.sansSubtitle(),
+          ),
+          const SizedBox(height: 24),
+
+          // Status Progress Timeline
+          if (isCancelled)
+            _buildCancelledTimeline()
+          else
+            _buildTimelineProgress(step),
+
+          const SizedBox(height: 32),
+
+          // Live Tracking details card (Courier information)
+          if (order.status == 'SHIPPED' || order.status == 'DELIVERED')
+            _buildCourierCard(order),
+
+          const SizedBox(height: 24),
+
+          // Delivery Address Card
+          Text(
+            'SHIPPING ADDRESS',
+            style: AppTextStyles.uppercaseLabel(color: AppColors.gold, fontSize: 10),
+          ),
+          const SizedBox(height: 8),
+          _buildAddressCard(order),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCancelledTimeline() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.error.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Row(
+        children: [
+          const Icon(LucideIcons.xCircle, color: AppColors.error, size: 24),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Order Cancelled',
+                  style: AppTextStyles.sansBody(fontWeight: FontWeight.bold, color: AppColors.error),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Your payment (if deducted) will be refunded to your source account or wallet.',
+                  style: AppTextStyles.sansSubtitle().copyWith(color: AppColors.error),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTimelineProgress(int currentStep) {
+    final stages = [
+      {'title': 'Order Placed', 'subtitle': 'Order successfully received'},
+      {'title': 'Confirmed', 'subtitle': 'Apparel is being tailor-crafted'},
+      {'title': 'Shipped', 'subtitle': 'Shipment is currently in transit'},
+      {'title': 'Delivered', 'subtitle': 'Package delivered at your doorstep'},
+    ];
+
+    return Card(
+      elevation: 0,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(4),
+        side: BorderSide(color: AppColors.goldLight.withOpacity(0.3)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          children: List.generate(stages.length, (index) {
+            final isCompleted = index <= currentStep;
+            final isLast = index == stages.length - 1;
+            
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Timeline Connector
+                Column(
+                  children: [
+                    Container(
+                      width: 16,
+                      height: 16,
+                      decoration: BoxDecoration(
+                        color: isCompleted ? AppColors.gold : Colors.white,
+                        border: Border.all(
+                          color: isCompleted ? AppColors.gold : Colors.grey[300]!,
+                          width: 2,
+                        ),
+                        shape: BoxShape.circle,
+                      ),
+                      child: isCompleted
+                          ? const Center(
+                              child: Icon(Icons.check, size: 10, color: Colors.white),
+                            )
+                          : null,
+                    ),
+                    if (!isLast)
+                      Container(
+                        width: 2,
+                        height: 45,
+                        color: index < currentStep ? AppColors.gold : Colors.grey[300]!,
+                      ),
+                  ],
+                ),
+                const SizedBox(width: 16),
+                
+                // Text details
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        stages[index]['title']!,
+                        style: AppTextStyles.sansBody(
+                          fontWeight: isCompleted ? FontWeight.bold : FontWeight.normal,
+                          color: isCompleted ? AppColors.charcoal : Colors.grey[500]!,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        stages[index]['subtitle']!,
+                        style: AppTextStyles.sansSubtitle().copyWith(
+                          color: isCompleted ? AppColors.stone : Colors.grey[400]!,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          }),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCourierCard(OrderModel order) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 24),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.goldLight.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: AppColors.goldLight),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(LucideIcons.truck, color: AppColors.gold, size: 20),
+              const SizedBox(width: 10),
+              Text(
+                'COURIER / CARRIER DETAILS',
+                style: AppTextStyles.uppercaseLabel(color: AppColors.gold, fontSize: 10),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _buildCourierRow('Shipping Partner:', order.trackingCompany ?? 'Standard Delivery'),
+          const SizedBox(height: 8),
+          _buildCourierRow('Tracking Number:', order.trackingNumber ?? 'None'),
+          const SizedBox(height: 12),
+          Text(
+            'Use the tracking number on the courier partner\'s website to check transit checkpoints.',
+            style: AppTextStyles.sansSubtitle().copyWith(fontSize: 10),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCourierRow(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: AppTextStyles.sansBody(color: AppColors.stone, fontSize: 12)),
+        Text(
+          value,
+          style: AppTextStyles.sansBody(fontWeight: FontWeight.bold, fontSize: 12),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAddressCard(OrderModel order) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: AppColors.goldLight.withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            order.customerName,
+            style: AppTextStyles.sansBody(fontWeight: FontWeight.bold, fontSize: 13),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            order.shippingAddress,
+            style: AppTextStyles.sansBody(color: Colors.grey[700]!, fontSize: 12),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            '${order.city}, ${order.state} - ${order.pincode}',
+            style: AppTextStyles.sansBody(color: Colors.grey[700]!, fontSize: 12),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Phone: ${order.customerPhone}',
+            style: AppTextStyles.sansSubtitle().copyWith(fontSize: 11),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+=== File: E:\projects\clothing_app\lib\views\profile\login_screen.dart ===
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:lucide_icons/lucide_icons.dart';
+import '../../core/constants/colors.dart';
+import '../../core/constants/text_styles.dart';
+import '../../providers/auth_provider.dart';
+import '../checkout/checkout_screen.dart';
+import '../main_navigation.dart';
+
+class LoginScreen extends StatefulWidget {
+  final bool redirectToCheckout;
+  
+  const LoginScreen({Key? key, this.redirectToCheckout = false}) : super(key: key);
+
+  @override
+  _LoginScreenState createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> {
+  final _phoneController = TextEditingController();
+  final _otpController = TextEditingController();
+
+  bool _otpSent = false;
+  String _errorMessage = '';
+
+  @override
+  void dispose() {
+    _phoneController.dispose();
+    _otpController.dispose();
+    super.dispose();
+  }
+
+  String _formatPhone(String raw) {
+    var phone = raw.trim();
+    if (!phone.startsWith('+')) {
+      if (phone.startsWith('91') && phone.length == 12) {
+        phone = '+$phone';
+      } else {
+        if (phone.startsWith('0')) {
+          phone = phone.substring(1);
+        }
+        phone = '+91$phone';
+      }
+    }
+    return phone;
+  }
+
+  void _handleSendOtp(AuthProvider auth) async {
+    final rawPhone = _phoneController.text.trim();
+    if (rawPhone.isEmpty) {
+      setState(() {
+        _errorMessage = 'Please enter a valid phone number';
+      });
+      return;
+    }
+
+    final phone = _formatPhone(rawPhone);
+
+    setState(() {
+      _errorMessage = '';
+    });
+
+    final success = await auth.sendOtp(phone);
+    if (success) {
+      setState(() {
+        _otpSent = true;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppColors.charcoal,
+          content: Text(
+            'OTP sent successfully (Check terminal/console for dev bypass)',
+            style: AppTextStyles.sansBody(color: Colors.white, fontSize: 12),
+          ),
+        ),
+      );
+    } else {
+      setState(() {
+        _errorMessage = 'Failed to dispatch verification OTP. Try again.';
+      });
+    }
+  }
+
+  void _handleVerifyOtp(AuthProvider auth) async {
+    final phone = _formatPhone(_phoneController.text);
+    final otp = _otpController.text.trim();
+
+    if (otp.isEmpty || otp.length < 4) {
+      setState(() {
+        _errorMessage = 'Please enter a valid OTP code';
+      });
+      return;
+    }
+
+    setState(() {
+      _errorMessage = '';
+    });
+
+    final success = await auth.verifyOtp(phone, otp);
+    if (success) {
+      if (widget.redirectToCheckout) {
+        // Pop LoginScreen and immediately push CheckoutScreen
+        Navigator.pop(context);
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => const CheckoutScreen(),
+          ),
+        );
+      } else {
+        // Direct transition into main homepage
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (context) => const MainNavigation(),
+          ),
+        );
+      }
+    } else {
+      setState(() {
+        _errorMessage = 'Invalid verification OTP code';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final auth = context.watch<AuthProvider>();
+
+    return Scaffold(
+      backgroundColor: AppColors.cream,
+      appBar: AppBar(
+        backgroundColor: AppColors.cream,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: AppColors.charcoal),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          _otpSent ? 'verify code' : 'phone login',
+          style: AppTextStyles.serifHeading3().copyWith(fontSize: 18),
+        ),
+      ),
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(28.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Welcome header
+              Text(
+                _otpSent ? 'Enter Code' : 'Welcome back',
+                style: AppTextStyles.serifHeading1(),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _otpSent 
+                    ? 'Enter the verification OTP code sent to ${_phoneController.text}'
+                    : 'Log in using your registered mobile number.',
+                style: AppTextStyles.sansSubtitle(),
+              ),
+              const SizedBox(height: 32),
+
+              // Inputs Card
+              Card(
+                elevation: 0,
+                color: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(4),
+                  side: BorderSide(color: AppColors.goldLight.withOpacity(0.3)),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    children: [
+                      if (!_otpSent) ...[
+                        // Phone input
+                        TextField(
+                          controller: _phoneController,
+                          keyboardType: TextInputType.phone,
+                          style: AppTextStyles.sansBody(fontSize: 13),
+                          decoration: InputDecoration(
+                            labelText: 'Mobile Phone Number',
+                            labelStyle: AppTextStyles.sansSubtitle(),
+                            prefixIcon: const Icon(LucideIcons.phone, size: 16, color: AppColors.stone),
+                            contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                            border: const OutlineInputBorder(),
+                            focusedBorder: const OutlineInputBorder(borderSide: BorderSide(color: AppColors.gold)),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: auth.isLoading ? null : () => _handleSendOtp(auth),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.charcoal,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                            ),
+                            child: auth.isLoading
+                                ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                                : Text(
+                                    'SEND VERIFICATION CODE',
+                                    style: AppTextStyles.uppercaseLabel(color: Colors.white, fontSize: 10, letterSpacing: 1.5),
+                                  ),
+                          ),
+                        ),
+                      ] else ...[
+                        // OTP Input
+                        TextField(
+                          controller: _otpController,
+                          keyboardType: TextInputType.number,
+                          style: AppTextStyles.sansBody(fontSize: 14, fontWeight: FontWeight.bold),
+                          textAlign: TextAlign.center,
+                          decoration: InputDecoration(
+                            labelText: 'Enter OTP Code',
+                            labelStyle: AppTextStyles.sansSubtitle(),
+                            prefixIcon: const Icon(LucideIcons.lock, size: 16, color: AppColors.stone),
+                            contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                            border: const OutlineInputBorder(),
+                            focusedBorder: const OutlineInputBorder(borderSide: BorderSide(color: AppColors.gold)),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: auth.isLoading ? null : () => _handleVerifyOtp(auth),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.charcoal,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                            ),
+                            child: auth.isLoading
+                                ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                                : Text(
+                                    'VERIFY CODE',
+                                    style: AppTextStyles.uppercaseLabel(color: Colors.white, fontSize: 10, letterSpacing: 1.5),
+                                  ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        TextButton(
+                          onPressed: () {
+                            setState(() {
+                              _otpSent = false;
+                              _otpController.clear();
+                            });
+                          },
+                          child: Text(
+                            'Edit Phone Number',
+                            style: AppTextStyles.uppercaseLabel(color: AppColors.stone, fontSize: 9),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              
+              if (_errorMessage.isNotEmpty)
+                Text(
+                  _errorMessage,
+                  style: const TextStyle(color: AppColors.error, fontSize: 12, fontWeight: FontWeight.bold),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+=== File: E:\projects\clothing_app\lib\views\profile\profile_screen.dart ===
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:lucide_icons/lucide_icons.dart';
+import '../../core/constants/colors.dart';
+import '../../core/constants/text_styles.dart';
+import '../../providers/auth_provider.dart';
+import 'login_screen.dart';
+import '../orders/history_screen.dart';
+
+class ProfileScreen extends StatelessWidget {
+  const ProfileScreen({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final authProvider = context.watch<AuthProvider>();
+    final user = authProvider.user;
+    final isAuth = authProvider.isAuthenticated;
+
+    return Scaffold(
+      backgroundColor: AppColors.cream,
+      appBar: AppBar(
+        backgroundColor: AppColors.cream,
+        elevation: 0,
+        centerTitle: true,
+        title: Text(
+          'my account',
+          style: AppTextStyles.serifHeading3(color: AppColors.charcoal).copyWith(
+            fontSize: 20,
+            letterSpacing: 1.5,
+          ),
+        ),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (isAuth && user != null) ...[
+              // User Details Card
+              _buildUserDetailsCard(user),
+              const SizedBox(height: 20),
+              
+              // Premium Gold Wallet Card
+              _buildWalletCard(user),
+              const SizedBox(height: 24),
+              
+              // Menu Links
+              Text(
+                'YOUR SHOPPING ASSISTANT',
+                style: AppTextStyles.uppercaseLabel(color: AppColors.gold, fontSize: 10),
+              ),
+              const SizedBox(height: 12),
+              _buildMenuCard(context),
+              
+              const SizedBox(height: 40),
+              
+              // Logout Button
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: () => authProvider.logout(),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.error,
+                    side: const BorderSide(color: AppColors.error),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                  ),
+                  child: Text(
+                    'LOG OUT',
+                    style: AppTextStyles.uppercaseLabel(color: AppColors.error, fontSize: 10, letterSpacing: 2.0),
+                  ),
+                ),
+              ),
+            ] else ...[
+              // Unauthenticated state view
+              _buildGuestView(context),
+            ],
+            const SizedBox(height: 40),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildUserDetailsCard(dynamic user) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: AppColors.goldLight.withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            user.name ?? 'Luxury Customer',
+            style: AppTextStyles.serifHeading3(),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            user.email,
+            style: AppTextStyles.sansSubtitle(),
+          ),
+          if (user.phone != null) ...[
+            const SizedBox(height: 2),
+            Text(
+              user.phone!,
+              style: AppTextStyles.sansSubtitle(),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWalletCard(dynamic user) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [AppColors.charcoal, Color(0xFF2D2D2D)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'CUSTOMER WALLET',
+                style: AppTextStyles.uppercaseLabel(color: AppColors.gold, fontSize: 9, letterSpacing: 2.0),
+              ),
+              const Icon(LucideIcons.wallet, color: AppColors.gold, size: 20),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Rs. ${user.walletBalance.toInt().toString()}',
+            style: AppTextStyles.serifHeading2(color: Colors.white).copyWith(fontSize: 28),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Funds will be auto-deducted during checkout',
+            style: AppTextStyles.sansSubtitle().copyWith(color: Colors.white70, fontSize: 10),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMenuCard(BuildContext context) {
+    return Card(
+      elevation: 0,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(4),
+        side: BorderSide(color: AppColors.goldLight.withOpacity(0.3)),
+      ),
+      child: Column(
+        children: [
+          _buildMenuItem(
+            icon: LucideIcons.shoppingBag,
+            title: 'Track Orders & Purchase History',
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (context) => const HistoryScreen()),
+              );
+            },
+          ),
+          const Divider(height: 1),
+          _buildMenuItem(
+            icon: LucideIcons.mapPin,
+            title: 'My Shipping Addresses',
+            onTap: () {},
+          ),
+          const Divider(height: 1),
+          _buildMenuItem(
+            icon: LucideIcons.helpCircle,
+            title: 'Customer Service & Contact Support',
+            onTap: () {},
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMenuItem({required IconData icon, required String title, required VoidCallback onTap}) {
+    return ListTile(
+      leading: Icon(icon, color: AppColors.gold, size: 18),
+      title: Text(
+        title,
+        style: AppTextStyles.sansBody(fontSize: 13),
+      ),
+      trailing: const Icon(Icons.chevron_right, size: 16, color: AppColors.stone),
+      onTap: onTap,
+    );
+  }
+
+  Widget _buildGuestView(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: AppColors.goldLight.withOpacity(0.3)),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(LucideIcons.user, color: AppColors.gold, size: 48),
+          const SizedBox(height: 16),
+          Text(
+            'Unlock Vamika & Bhargavi',
+            style: AppTextStyles.serifHeading3(),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Log in to review customized checkout states, wallet transactions, and trace shipped delivery timelines.',
+            style: AppTextStyles.sansSubtitle(),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (context) => const LoginScreen()),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.charcoal,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+              ),
+              child: Text(
+                'LOG IN / REGISTER',
+                style: AppTextStyles.uppercaseLabel(color: Colors.white, fontSize: 10, letterSpacing: 2.0),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+=== File: E:\projects\clothing_app\lib\views\shop\catalog_screen.dart ===
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:lucide_icons/lucide_icons.dart';
+import '../../core/constants/colors.dart';
+import '../../core/constants/text_styles.dart';
+import '../../providers/product_provider.dart';
+import 'detail_screen.dart';
+
+class CatalogScreen extends StatefulWidget {
+  const CatalogScreen({Key? key}) : super(key: key);
+
+  @override
+  _CatalogScreenState createState() => _CatalogScreenState();
+}
+
+class _CatalogScreenState extends State<CatalogScreen> {
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController.addListener(() {
+      context.read<ProductProvider>().applyFilters(search: _searchController.text);
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = context.watch<ProductProvider>();
+    final products = provider.filteredProducts;
+
+    return Scaffold(
+      backgroundColor: AppColors.cream,
+      appBar: AppBar(
+        backgroundColor: AppColors.cream,
+        elevation: 0,
+        centerTitle: true,
+        title: Text(
+          'catalog',
+          style: AppTextStyles.serifHeading3(color: AppColors.charcoal).copyWith(
+            fontSize: 20,
+            letterSpacing: 1.5,
+          ),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(LucideIcons.sliders, color: AppColors.charcoal, size: 20),
+            onPressed: () => _showFilterDrawer(context),
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          // Elegant Search Input
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Search designer wear, collections...',
+                hintStyle: AppTextStyles.sansSubtitle(),
+                prefixIcon: const Icon(LucideIcons.search, size: 18, color: AppColors.stone),
+                suffixIcon: _searchController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear, size: 16),
+                        onPressed: () {
+                          _searchController.clear();
+                          provider.clearFilters();
+                        },
+                      )
+                    : null,
+                filled: true,
+                fillColor: Colors.white,
+                contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(4),
+                  borderSide: BorderSide(color: AppColors.goldLight.withOpacity(0.4)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(4),
+                  borderSide: const BorderSide(color: AppColors.gold),
+                ),
+              ),
+            ),
+          ),
+          
+          // Active filter badges
+          if (provider.selectedCategory.isNotEmpty || provider.selectedCollection.isNotEmpty)
+            _buildActiveFilters(context, provider),
+
+          // Catalog Grid
+          Expanded(
+            child: provider.isLoading
+                ? const Center(child: CircularProgressIndicator(color: AppColors.gold))
+                : products.isEmpty
+                    ? _buildEmptyState()
+                    : GridView.builder(
+                        padding: const EdgeInsets.all(16),
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          childAspectRatio: 0.65,
+                          crossAxisSpacing: 16,
+                          mainAxisSpacing: 16,
+                        ),
+                        itemCount: products.length,
+                        itemBuilder: (context, index) {
+                          final product = products[index];
+                          return _buildCatalogCard(context, product);
+                        },
+                      ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActiveFilters(BuildContext context, ProductProvider provider) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Row(
+        children: [
+          Text(
+            'Filters:',
+            style: AppTextStyles.sansSubtitle().copyWith(fontSize: 11),
+          ),
+          const SizedBox(width: 8),
+          if (provider.selectedCategory.isNotEmpty)
+            _buildFilterChip(provider.selectedCategory, () {
+              provider.applyFilters(category: '');
+            }),
+          const SizedBox(width: 6),
+          if (provider.selectedCollection.isNotEmpty)
+            _buildFilterChip(provider.selectedCollection, () {
+              provider.applyFilters(collection: '');
+            }),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterChip(String label, VoidCallback onDeleted) {
+    return Chip(
+      label: Text(
+        label.toLowerCase(),
+        style: const TextStyle(fontSize: 10, color: AppColors.charcoal, fontWeight: FontWeight.bold),
+      ),
+      backgroundColor: AppColors.goldLight.withOpacity(0.5),
+      deleteIconColor: AppColors.charcoal,
+      deleteIcon: const Icon(Icons.close, size: 10),
+      onDeleted: onDeleted,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+      padding: EdgeInsets.zero,
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(LucideIcons.frown, color: AppColors.gold, size: 48),
+          const SizedBox(height: 16),
+          Text(
+            'No apparel matches found',
+            style: AppTextStyles.serifHeading3(),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Try altering your search or filters.',
+            style: AppTextStyles.sansSubtitle(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCatalogCard(BuildContext context, dynamic product) {
+    final hasDiscount = product.discountPercent > 0;
+    final double basePrice = product.variants.isNotEmpty ? product.variants[0].price : 0.0;
+    final double salePrice = hasDiscount 
+        ? basePrice * (1 - product.discountPercent / 100) 
+        : basePrice;
+
+    return GestureDetector(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => DetailScreen(product: product),
+          ),
+        );
+      },
+      child: Container(
+        color: Colors.white,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Image with badge
+            Expanded(
+              child: Stack(
+                children: [
+                  Container(
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      image: DecorationImage(
+                        image: NetworkImage(product.images.isNotEmpty ? product.images[0] : 'https://via.placeholder.com/150'),
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  ),
+                  if (hasDiscount)
+                    Positioned(
+                      top: 8,
+                      left: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        color: AppColors.error,
+                        child: Text(
+                          '${product.discountPercent.toInt()}% OFF',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            
+            // Text Details
+            Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    product.title,
+                    style: AppTextStyles.sansBody(fontSize: 13, fontWeight: FontWeight.bold),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    product.category.toUpperCase(),
+                    style: AppTextStyles.uppercaseLabel(color: AppColors.stone, fontSize: 8),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Text(
+                        'Rs. ${salePrice.toInt().toString()}',
+                        style: AppTextStyles.sansBody(
+                          color: hasDiscount ? AppColors.error : AppColors.charcoal,
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      if (hasDiscount) ...[
+                        const SizedBox(width: 6),
+                        Text(
+                          'Rs. ${basePrice.toInt().toString()}',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.grey[500],
+                            decoration: TextDecoration.lineThrough,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showFilterDrawer(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.cream,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) {
+        return const FilterBottomSheet();
+      },
+    );
+  }
+}
+
+class FilterBottomSheet extends StatelessWidget {
+  const FilterBottomSheet({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = context.watch<ProductProvider>();
+    final categories = provider.categories;
+    final collections = provider.collections;
+
+    return Padding(
+      padding: const EdgeInsets.all(24.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Filter Products',
+                style: AppTextStyles.serifHeading3(),
+              ),
+              TextButton(
+                onPressed: () {
+                  provider.clearFilters();
+                  Navigator.pop(context);
+                },
+                child: Text(
+                  'CLEAR ALL',
+                  style: AppTextStyles.uppercaseLabel(color: AppColors.stone, fontSize: 10),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          
+          // Categories List
+          Text(
+            'CATEGORIES',
+            style: AppTextStyles.uppercaseLabel(color: AppColors.gold, fontSize: 10),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            children: categories.map((cat) {
+              final isSelected = provider.selectedCategory.toLowerCase() == cat.toLowerCase();
+              return ChoiceChip(
+                label: Text(
+                  cat,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isSelected ? Colors.white : AppColors.charcoal,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  ),
+                ),
+                selected: isSelected,
+                selectedColor: AppColors.charcoal,
+                backgroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(4),
+                  side: BorderSide(color: AppColors.goldLight.withOpacity(0.5)),
+                ),
+                onSelected: (selected) {
+                  provider.applyFilters(category: selected ? cat : '');
+                },
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 20),
+
+          // Collections List
+          Text(
+            'COLLECTIONS',
+            style: AppTextStyles.uppercaseLabel(color: AppColors.gold, fontSize: 10),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            children: collections.map((col) {
+              final isSelected = provider.selectedCollection.toLowerCase() == col.toLowerCase();
+              return ChoiceChip(
+                label: Text(
+                  col,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isSelected ? Colors.white : AppColors.charcoal,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  ),
+                ),
+                selected: isSelected,
+                selectedColor: AppColors.charcoal,
+                backgroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(4),
+                  side: BorderSide(color: AppColors.goldLight.withOpacity(0.5)),
+                ),
+                onSelected: (selected) {
+                  provider.applyFilters(collection: selected ? col : '');
+                },
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 24),
+          
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () => Navigator.pop(context),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.charcoal,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+              ),
+              child: Text(
+                'APPLY FILTERS',
+                style: AppTextStyles.uppercaseLabel(color: Colors.white, fontSize: 11, letterSpacing: 2.0),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+=== File: E:\projects\clothing_app\lib\views\shop\detail_screen.dart ===
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:lucide_icons/lucide_icons.dart';
+import '../../core/constants/colors.dart';
+import '../../core/constants/text_styles.dart';
+import '../../models/product.dart';
+import '../../models/cart_item.dart';
+import '../../providers/cart_provider.dart';
+
+class DetailScreen extends StatefulWidget {
+  final Product product;
+  const DetailScreen({Key? key, required this.product}) : super(key: key);
+
+  @override
+  _DetailScreenState createState() => _DetailScreenState();
+}
+
+class _DetailScreenState extends State<DetailScreen> {
+  int _activeImageIndex = 0;
+  String? _selectedTopSize;
+  String? _selectedBottomSize;
+  
+  // Holds mapping of optionName to selected value option
+  final Map<String, ProductOption> _selectedOptionsMap = {};
+
+  @override
+  void initState() {
+    super.initState();
+    
+    // Default select standard sizes if available
+    _selectedTopSize = 'M';
+    if (widget.product.isSet) {
+      _selectedBottomSize = 'M';
+    }
+
+    // Default select the first value for each options group
+    final optionGroups = <String, List<ProductOption>>{};
+    for (var opt in widget.product.options) {
+      optionGroups.putIfAbsent(opt.optionName, () => []).add(opt);
+    }
+
+    optionGroups.forEach((groupName, optsList) {
+      if (optsList.isNotEmpty) {
+        _selectedOptionsMap[groupName] = optsList[0];
+      }
+    });
+  }
+
+  double get _currentPrice {
+    final hasDiscount = widget.product.discountPercent > 0;
+    
+    // 1. Get base variant price
+    double price = widget.product.variants.isNotEmpty 
+        ? widget.product.variants[0].price 
+        : 0.0;
+
+    // Apply seller discount to base price
+    if (hasDiscount) {
+      price = price * (1 - widget.product.discountPercent / 100);
+    }
+
+    // 2. Add options price adjustments
+    double adjustments = 0.0;
+    _selectedOptionsMap.values.forEach((opt) {
+      adjustments += opt.priceAdjustment;
+    });
+
+    return price + adjustments;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final product = widget.product;
+    final images = product.images.isNotEmpty ? product.images : ['https://via.placeholder.com/400'];
+    final optionGroups = <String, List<ProductOption>>{};
+    for (var opt in product.options) {
+      optionGroups.putIfAbsent(opt.optionName, () => []).add(opt);
+    }
+
+    return Scaffold(
+      backgroundColor: AppColors.cream,
+      body: CustomScrollView(
+        slivers: [
+          // Elegant Header Image Banner
+          SliverAppBar(
+            expandedHeight: 480,
+            pinned: true,
+            backgroundColor: AppColors.cream,
+            elevation: 0,
+            leading: CircleAvatar(
+              backgroundColor: Colors.white.withOpacity(0.8),
+              child: IconButton(
+                icon: const Icon(Icons.arrow_back, color: AppColors.charcoal),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ),
+            flexibleSpace: FlexibleSpaceBar(
+              background: Stack(
+                children: [
+                  PageView.builder(
+                    itemCount: images.length,
+                    onPageChanged: (index) {
+                      setState(() {
+                        _activeImageIndex = index;
+                      });
+                    },
+                    itemBuilder: (context, index) {
+                      return Image.network(
+                        images[index],
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                      );
+                    },
+                  ),
+                  
+                  // Active page indicator dots
+                  if (images.length > 1)
+                    Positioned(
+                      bottom: 24,
+                      left: 0,
+                      right: 0,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: List.generate(images.length, (index) {
+                          return Container(
+                            width: 6,
+                            height: 6,
+                            margin: const EdgeInsets.symmetric(horizontal: 4),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: _activeImageIndex == index
+                                  ? AppColors.gold
+                                  : Colors.white.withOpacity(0.5),
+                            ),
+                          );
+                        }),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          
+          // Details Card
+          SliverToBoxAdapter(
+            child: Container(
+              color: Colors.white,
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Collection Label & Discount Badge
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        product.category.toUpperCase(),
+                        style: AppTextStyles.uppercaseLabel(color: AppColors.stone, fontSize: 10),
+                      ),
+                      if (product.discountPercent > 0)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          color: AppColors.error,
+                          child: Text(
+                            '${product.discountPercent.toInt()}% OFF',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  
+                  // Product Title
+                  Text(
+                    product.title,
+                    style: AppTextStyles.serifHeading2(),
+                  ),
+                  
+                  // Seller Details
+                  if (product.sellerShopName != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'by ${product.sellerShopName}',
+                      style: AppTextStyles.sansSubtitle(),
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+                  
+                  // Price breakdown
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Text(
+                        'Rs. ${_currentPrice.toInt().toString()}',
+                        style: AppTextStyles.serifHeading3(color: AppColors.charcoal).copyWith(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '(Inclusive of taxes)',
+                        style: AppTextStyles.sansSubtitle().copyWith(fontSize: 10),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  
+                  // Size Selector
+                  Text(
+                    product.isSet ? 'SELECT TOP SIZE' : 'SELECT SIZE',
+                    style: AppTextStyles.uppercaseLabel(color: AppColors.gold, fontSize: 10),
+                  ),
+                  const SizedBox(height: 8),
+                  _buildSizeGrid((size) {
+                    setState(() {
+                      _selectedTopSize = size;
+                    });
+                  }, _selectedTopSize),
+                  
+                  if (product.isSet) ...[
+                    const SizedBox(height: 16),
+                    Text(
+                      'SELECT BOTTOM SIZE',
+                      style: AppTextStyles.uppercaseLabel(color: AppColors.gold, fontSize: 10),
+                    ),
+                    const SizedBox(height: 8),
+                    _buildSizeGrid((size) {
+                      setState(() {
+                        _selectedBottomSize = size;
+                      });
+                    }, _selectedBottomSize),
+                  ],
+                  const SizedBox(height: 24),
+
+                  // Customized Product Options
+                  if (optionGroups.isNotEmpty) ...[
+                    ...optionGroups.entries.map((entry) {
+                      final groupName = entry.key;
+                      final optsList = entry.value;
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            groupName.toUpperCase(),
+                            style: AppTextStyles.uppercaseLabel(color: AppColors.gold, fontSize: 10),
+                          ),
+                          const SizedBox(height: 8),
+                          _buildOptionsRow(groupName, optsList),
+                          const SizedBox(height: 20),
+                        ],
+                      );
+                    }).toList(),
+                  ],
+
+                  // Product Details / Fabric
+                  ExpansionTile(
+                    title: Text('Fabric & Product Details', style: AppTextStyles.sansBody(fontWeight: FontWeight.bold, fontSize: 12)),
+                    tilePadding: EdgeInsets.zero,
+                    childrenPadding: EdgeInsets.zero,
+                    expandedAlignment: Alignment.topLeft,
+                    expandedCrossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        product.description,
+                        style: AppTextStyles.sansBody(fontSize: 13, color: Colors.grey[700]!),
+                      ),
+                      const SizedBox(height: 12),
+                      if (product.fabricDetails != null)
+                        _buildDetailText('Fabric:', product.fabricDetails!),
+                      if (product.careInstructions != null)
+                        _buildDetailText('Care:', product.careInstructions!),
+                      _buildDetailText('Expected Dispatch:', product.deliveryTimeline),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+      bottomNavigationBar: Container(
+        padding: const EdgeInsets.all(16),
+        color: Colors.white,
+        child: SafeArea(
+          child: Row(
+            children: [
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () => _handleAddToBag(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.charcoal,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(LucideIcons.shoppingBag, size: 18),
+                      const SizedBox(width: 10),
+                      Text(
+                        'ADD TO BAG',
+                        style: AppTextStyles.uppercaseLabel(color: Colors.white, fontSize: 12, letterSpacing: 2.5),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSizeGrid(Function(String) onSelected, String? currentValue) {
+    final sizes = ['XS', 'S', 'M', 'L', 'XL', 'Custom'];
+    return Wrap(
+      spacing: 8,
+      children: sizes.map((size) {
+        final isSelected = currentValue == size;
+        return GestureDetector(
+          onTap: () => onSelected(size),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: isSelected ? AppColors.charcoal : Colors.white,
+              border: Border.all(
+                color: isSelected ? AppColors.charcoal : AppColors.goldLight,
+                width: 1,
+              ),
+              borderRadius: BorderRadius.circular(2),
+            ),
+            child: Text(
+              size,
+              style: TextStyle(
+                fontSize: 12,
+                color: isSelected ? Colors.white : AppColors.charcoal,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildOptionsRow(String groupName, List<ProductOption> options) {
+    return Wrap(
+      spacing: 8,
+      children: options.map((opt) {
+        final isSelected = _selectedOptionsMap[groupName]?.id == opt.id;
+        final extraPrice = opt.priceAdjustment > 0 
+            ? ' (+Rs. ${opt.priceAdjustment.toInt().toString()})' 
+            : '';
+
+        return ChoiceChip(
+          label: Text(
+            '${opt.optionValue}$extraPrice',
+            style: TextStyle(
+              fontSize: 11,
+              color: isSelected ? Colors.white : AppColors.charcoal,
+            ),
+          ),
+          selected: isSelected,
+          selectedColor: AppColors.charcoal,
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(4),
+            side: BorderSide(color: AppColors.goldLight.withOpacity(0.5)),
+          ),
+          onSelected: (selected) {
+            if (selected) {
+              setState(() {
+                _selectedOptionsMap[groupName] = opt;
+              });
+            }
+          },
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildDetailText(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6.0),
+      child: RichText(
+        text: TextSpan(
+          style: AppTextStyles.sansBody(fontSize: 12, color: Colors.grey[700]!),
+          children: [
+            TextSpan(text: '$label ', style: const TextStyle(fontWeight: FontWeight.bold)),
+            TextSpan(text: value),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _handleAddToBag(BuildContext context) async {
+    final product = widget.product;
+    final basePrice = product.variants.isNotEmpty ? product.variants[0].price : 0.0;
+    
+    // Sort options to build a stable ID
+    final sortedOptionsList = _selectedOptionsMap.values.toList()
+      ..sort((a, b) => a.id.compareTo(b.id));
+
+    final String compoundId = '${product.id}_${_selectedTopSize ?? ''}_${_selectedBottomSize ?? ''}_${sortedOptionsList.map((o) => o.id).join('_')}';
+
+    final cartItem = CartItem(
+      id: compoundId,
+      productId: product.id,
+      productTitle: product.title,
+      productImage: product.images.isNotEmpty ? product.images[0] : 'https://via.placeholder.com/150',
+      category: product.category,
+      sellerShopName: product.sellerShopName ?? 'Luxury Boutique',
+      variantId: product.variants.isNotEmpty ? product.variants[0].id : '',
+      topSize: _selectedTopSize,
+      bottomSize: _selectedBottomSize,
+      basePrice: basePrice,
+      selectedOptions: sortedOptionsList.map((o) => SelectedOption(
+        id: o.id,
+        optionName: o.optionName,
+        optionValue: o.optionValue,
+        priceAdjustment: o.priceAdjustment,
+      )).toList(),
+      quantity: 1,
+      unitPrice: _currentPrice,
+      deliveryTimeline: product.deliveryTimeline,
+    );
+
+    // Call Provider to add to bag
+    await context.read<CartProvider>().addItem(cartItem);
+
+    // Success popup feedback
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: AppColors.charcoal,
+        content: Row(
+          children: [
+            const Icon(LucideIcons.checkCircle, color: AppColors.gold, size: 18),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Added to Shopping Bag successfully!',
+                style: AppTextStyles.sansBody(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+}
+
