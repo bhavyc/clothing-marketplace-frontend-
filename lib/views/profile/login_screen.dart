@@ -76,11 +76,14 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() {
         _otpSent = true;
       });
+      final showDevTip = auth.devOtp != null;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           backgroundColor: AppColors.charcoal,
           content: Text(
-            'OTP sent successfully (Check terminal/console for dev bypass)',
+            showDevTip
+                ? 'OTP sent successfully (Check screen for dev bypass)'
+                : 'OTP code sent successfully.',
             style: AppTextStyles.sansBody(color: Colors.white, fontSize: 12),
           ),
         ),
