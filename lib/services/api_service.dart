@@ -6,7 +6,7 @@ class ApiService {
   // Agar aap local machine par test kar rahe hain:
   // Android Emulator ke liye local host IP: 'http://10.0.2.2:3000' hoti hai.
   // iOS Simulator ke liye: 'http://localhost:3000'
-  static const String baseUrl = 'http://10.54.220.121:3000'; 
+  static const String baseUrl = 'http://10.54.220.189:3000'; 
 
   // 1. OTP Send Request
   static Future<Map<String, dynamic>> sendOtp(String phoneNumber) async {

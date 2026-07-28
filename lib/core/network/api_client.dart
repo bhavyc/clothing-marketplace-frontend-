@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiClient {
-  static String baseUrl = 'http://10.54.220.121:3000/api';
+  static String baseUrl = 'http://10.54.220.189:3000/api';
 
   static String formatImageUrl(String url) {
     if (url.isEmpty) return 'https://via.placeholder.com/150';
