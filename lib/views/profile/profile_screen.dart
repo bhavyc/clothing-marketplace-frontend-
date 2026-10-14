@@ -305,15 +305,18 @@ class ProfileScreen extends StatelessWidget {
   }
 
   Widget _buildMenuItem({required IconData icon, required String title, required VoidCallback onTap}) {
-    return ListTile(
-      leading: Icon(icon, color: AppColors.gold, size: 16),
-      title: Text(
-        title,
-        style: AppTextStyles.sansBody(fontSize: 13, color: AppColors.charcoal),
+    return Material(
+      color: Colors.transparent,
+      child: ListTile(
+        leading: Icon(icon, color: AppColors.gold, size: 16),
+        title: Text(
+          title,
+          style: AppTextStyles.sansBody(fontSize: 13, color: AppColors.charcoal),
+        ),
+        trailing: const Icon(Icons.arrow_forward_ios, size: 12, color: AppColors.stone),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        onTap: onTap,
       ),
-      trailing: const Icon(Icons.arrow_forward_ios, size: 12, color: AppColors.stone),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      onTap: onTap,
     );
   }
 

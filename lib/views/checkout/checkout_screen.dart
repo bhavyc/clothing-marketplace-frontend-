@@ -375,22 +375,25 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           ),
         ],
       ),
-      child: SwitchListTile(
-        title: Text(
-          'Deduct from Wallet',
-          style: AppTextStyles.sansBody(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.charcoal),
+      child: Material(
+        color: Colors.transparent,
+        child: SwitchListTile(
+          title: Text(
+            'Deduct from Wallet',
+            style: AppTextStyles.sansBody(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.charcoal),
+          ),
+          subtitle: Text(
+            'Available: Rs. ${user.walletBalance.toInt().toString()}',
+            style: AppTextStyles.sansSubtitle().copyWith(color: AppColors.stone),
+          ),
+          value: _useWallet,
+          activeColor: AppColors.gold,
+          onChanged: (val) {
+            setState(() {
+              _useWallet = val;
+            });
+          },
         ),
-        subtitle: Text(
-          'Available: Rs. ${user.walletBalance.toInt().toString()}',
-          style: AppTextStyles.sansSubtitle().copyWith(color: AppColors.stone),
-        ),
-        value: _useWallet,
-        activeColor: AppColors.gold,
-        onChanged: (val) {
-          setState(() {
-            _useWallet = val;
-          });
-        },
       ),
     );
   }
